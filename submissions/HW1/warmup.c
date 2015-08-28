@@ -1,4 +1,6 @@
-/*
+/* I have neither given nor recieved help on this assignment.
+ * Price Clark
+ *
  * Step 1. Read a character from stdin then print to stdout.
  * Step 2. Verify input to make sure that we only accept printable chars
  *         and the valid whitespace chars, tab, space, carriage return.
@@ -12,11 +14,23 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define LINE_LENGTH 10
+#define LINE_LENGTH 80
+
+
+// To abstract away what valid input is, should it change, this function checks
+// to make sure the character from the input stream is something to process:
+// printable characters or valid whitespace characters
+bool is_valid_input(int character){
+  if(isprint(character) || isspace(character)){
+    return true;
+  }else{
+    return false;
+  }
+}
+
 
 int main() {
   int input_char;
-  bool asterisk_encountered = false;
 
   int *buffer = (int *) malloc(sizeof(int)*LINE_LENGTH);
   if(buffer == NULL){
@@ -27,21 +41,17 @@ int main() {
   do{
 
     input_char = fgetc(stdin);
-
-    if(isprint(input_char) || isspace(input_char)){
+   
+    if(is_valid_input(input_char)){
 
       if(input_char == '\n'){
         input_char = ' ';
       }
-      if(input_char == '*'){
-        asterisk_encountered = true;
-      }
 
       if(count < LINE_LENGTH){
-        if(asterisk_encountered && (count != 0) && (buffer[count-1] == '*') ){
+        if((count != 0) && (buffer[count-1] == '*') && input_char == '*' ){
           buffer[count-1] = '^'; 
           --count;
-          asterisk_encountered = false;
         }
 
         else{
