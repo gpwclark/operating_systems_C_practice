@@ -39,14 +39,14 @@ int perform_special_char_substitutions(int *buffer){
 }
 
 // This handles the more complex 2:1 '**' -> '^' substitution.
-int perform_complex_char_substitutions(int *buffer,int count,int character){
+int perform_complex_char_substitutions(int *buffer,int index,int character){
 
-  if((count != 0) && (buffer[count-1] == '*') && (character == '*') ) {
-    buffer[count-1] = '^';
-    --count;
+  if((index != 0) && (buffer[index-1] == '*') && (character == '*') ) {
+    buffer[index - 1] = '^';
+    --index;
   }
 
-  return count;
+  return index;
 }
 
 
