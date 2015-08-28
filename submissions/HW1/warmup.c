@@ -16,6 +16,9 @@
 
 #define LINE_LENGTH 10
 
+// Due to the special case in this program where there are two asterisks
+// at the end of the line, one must look ahead before printing the string 
+// to verify that it shouldn't be a character substitution instead.
 int perform_special_char_substitutions(int *buffer){
   if(buffer[LINE_LENGTH-1] == '*'){
     int temp_char = fgetc(stdin);
@@ -35,15 +38,17 @@ int perform_special_char_substitutions(int *buffer){
   return 0;
 }
 
-int append_to_buffer(int *buffer, int character, int count){
-  if((count != 0) && (buffer[count-1] == '*') && character == '*' ){
-    buffer[count-1] = '^'; 
+// This handles the more complex 2:1 '**' -> '^' substitution.
+int perform_complex_char_substitutions(int *buffer,int count,int character){
+
+  if((count != 0) && (buffer[count-1] == '*') && (character == '*') ) {
+    buffer[count-1] = '^';
     --count;
-  }else{
-    buffer[count] = character;
   }
+
   return count;
 }
+
 
 // As of now there is only one direct 1:1 substitution should that change this
 // function will accommodate said changes.
@@ -81,9 +86,10 @@ int main() {
 
     if(is_valid_input(input_char)){
       input_char = perform_simple_char_substitutions(input_char);
+      count = perform_complex_char_substitutions(buffer,count,input_char);
 
       if(count < LINE_LENGTH){
-        count = append_to_buffer(buffer, input_char, count);
+        buffer[count] = input_char;
       }
 
       ++count;
