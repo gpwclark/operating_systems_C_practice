@@ -5,7 +5,7 @@
 
 # macros to define commonly used strings
 CC = g++
-CFLAGS = -Wall -Wstrict-null-sentinel -Wextra -Wwrite-strings -fno-common -pedantic -g2 # -Werror
+CFLAGS = -Wall -Wstrict-null-sentinel -Wextra -Wwrite-strings -fno-common -pedantic -g2 
 
 # general Makefile syntax
 # <target name> : <target prerequisites>
