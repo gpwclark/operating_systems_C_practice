@@ -35,13 +35,14 @@ int perform_special_char_substitutions(int *buffer){
   return 0;
 }
 
-void append_to_buffer(int *buffer, int character, int count){
+int append_to_buffer(int *buffer, int character, int count){
   if((count != 0) && (buffer[count-1] == '*') && character == '*' ){
     buffer[count-1] = '^'; 
     --count;
   }else{
     buffer[count] = character;
   }
+  return count;
 }
 
 // As of now there is only one direct 1:1 substitution should that change this
@@ -82,7 +83,7 @@ int main() {
       input_char = perform_simple_char_substitutions(input_char);
 
       if(count < LINE_LENGTH){
-        append_to_buffer(buffer, input_char, count);
+        count = append_to_buffer(buffer, input_char, count);
       }
 
       ++count;
