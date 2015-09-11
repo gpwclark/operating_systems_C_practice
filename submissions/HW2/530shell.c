@@ -7,30 +7,69 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+#define MAX_ARGS 100
+
 //TODO make shell prompt a constant?
 //TODO meaningful error messages
 //TODO does shell_prompt print one extra time?
 //TODO are sys wait.h/type.h AND unistd.h redundant?
+//TODO error message about MAX_ARGS
 
-char** parse_args(char *raw_arg_string){
-  char** string_array;  
+int parse_args(char *raw_arg_string, char **string_array){
+  char *token;
+  char white_space_delim[] = " \t\n\v\f\r";
+  char *new_string = strdup(raw_arg_string);
+  token = strtok(new_string, white_space_delim);
 
-  return string_array; 
+  int i = 0;
+  while( (token != NULL) && (i < MAX_ARGS)){ 
+    string_array[i] = token; 
+    //printf("%s\n", string_array[i]);
+    token = strtok(NULL, white_space_delim);
+    ++i;
+  }
+
+  if(i < 100){
+    return 0;
+  }else{
+    return -1;
+  }
 }
 
 void test_run_shell(CuTest *tc) {
   int array_length;
+  char **string_array;
+  int ret_val;
 
-  array_length = 6;
-  char *input = strdup("oi i'm an argument, parse me");
-  char **actual = parse_args(input); 
-  char *expected[] = {"oi", "i'm", "an", "argument,", "parse", "me"};
+  string_array = (char**)malloc(MAX_ARGS * sizeof(char*));
+  if(string_array == NULL){
+    //TODO handle the error!!
+    //malloc sets errno
+  }
 
+
+  array_length = 11;
+  char *input = "oi i'm an argument, parse me please" " look this is longer";
+  ret_val = parse_args(input, string_array); 
+  char *expected[] = {"oi", "i'm", "an", "argument,", "parse", "me", "please", "look", "this", "is", "longer"};
   int i = 0;
-  while(i < 6){
-    CuAssertStrEquals(tc, expected[i], actual[i]);
+  printf("%s\n",*string_array);
+  while((i < array_length) && (ret_val != -1)){
+    CuAssertStrEquals(tc, expected[i], string_array[i]);
     ++i;
   }
+
+  array_length = 13;
+  input = "laksjdas dsaldkjsa dlsakjfal 0913  lkj l; jal sal s l			lk alks s";
+  ret_val = parse_args(input, string_array);
+  char *expected0[] = {"laksjdas", "dsaldkjsa", "dlsakjfal", "0913", "lkj", "l;", "jal", "sal", "s", "l", "lk", "alks", "s"};
+  i = 0;
+  while((i < array_length) && (ret_val != -1)){
+    CuAssertStrEquals(tc, expected0[i], string_array[i]);
+    ++i;
+  }
+
+  free(string_array);
 }
 
 
@@ -78,23 +117,44 @@ int run_shell() {
 
       printf("I am the child. My childPID is %ld\n", (long)child_PID);
 
-      // delete this when done experimenting 17
-      printf("Enter a random seed.n");
-      if(gets(buffer)) {
+      char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
+      if(string_array == NULL){
+        //TODO error message here!!!!
+        // malloc sets errno!
+      }
+
+      int ret_val = parse_args(line, string_array); 
+      if(ret_val == -1){
+        //TODO ERROR, LINE EXCEEDS MAX LENGTH
+        //custom errors?
+      }
+      
+      errno = 0;
+      int exec_return = execvp(*string_array,string_array);
+      if (exec_return < 0) {
+        perror("Failed to execute, error with command as inputted");
+        //exit(1); //TODO reflect on this exit bull shit. almost positive it's a no.
+      }
+      /*// delete this when done experimenting 17
+        printf("Enter a random seed.n");
+        if(gets(buffer)) {
         seed = atoi(buffer);
         srand(seed);
-      }
-      randomNumber = rand();        /* random end to child process */
-      if ((randomNumber % 2) == 0) {
+        }
+        randomNumber = rand();
+        if ((randomNumber % 2) == 0) {
         printf("Child process aborted; pid = %d.n", (int) child_PID);
         abort();
         fclose(stdout);
-      }
-      else {
+        }
+        else {
         printf("Child process ended normally; pid = %d.n", (int) child_PID);
         exit(EXIT_SUCCESS);
-      }
-      //end delete 
+        }
+      //end delete
+      */
+
+      free(string_array);
 
     }else {
       //we are the parent
@@ -102,12 +162,12 @@ int run_shell() {
       errno = 0; // TODO what do to with errno?
 
       child_PID = wait(&status);
-      
+
       // delete this when done experimenting
       //
       if (child_PID == -1){ //Wait for child process.
         perror("wait error");
-      
+
       }  else { // Check Status 
         if (WIFSIGNALED(status) != 0)
           printf("Child process ended because of signal %d.n",
@@ -122,13 +182,13 @@ int run_shell() {
 
     }
   } while (input_char != EOF);
-  free(line);
+    free(line);
 
-  if (errno == 0){
-    return 0;
-  }else{
-    return -1;
-  }
+    if (errno == 0){
+      return 0;
+    }else{
+      return -1;
+    }
 }
 
 CuSuite* ShellGetSuite() {
