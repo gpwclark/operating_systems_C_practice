@@ -9,11 +9,10 @@
 
 #define MAX_ARGS 100
 
-//TODO make shell prompt a constant?
-//TODO meaningful error messages
-//TODO does shell_prompt print one extra time?
-//TODO are sys wait.h/type.h AND unistd.h redundant?
-//TODO error message about MAX_ARGS
+//TODO delete print statements and comments
+//TODO test on classroom.cs.unc.edu
+//TODO delete the code from web and make sure mine works.
+//TODO to more testing on parse_args with testing function including manually adding weird shit.
 
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
@@ -43,8 +42,7 @@ void test_run_shell(CuTest *tc) {
 
   string_array = (char**)malloc(MAX_ARGS * sizeof(char*));
   if(string_array == NULL){
-    //TODO handle the error!!
-    //malloc sets errno
+    printf("%s\n.", "malloc failed");
   }
 
 
@@ -75,7 +73,8 @@ void test_run_shell(CuTest *tc) {
 
 
 int run_shell() {
-  char *shell_prompt = "% ";
+  static const char SHELL_PROMPT[] = "% ";
+  //char *shell_prompt = "% ";
   char *line;
   size_t chars_to_read = 0;
   int chars_read;
@@ -85,55 +84,56 @@ int run_shell() {
 
   int input_char;
   //delete these when done experimenting 4
-  int randomNumber, seed;
-  char buffer[80];
+  //int randomNumber, seed;  //DELETE ME
+  //char buffer[80]; //DELETE ME
   //end delete 
 
   do {
-    printf("%s",shell_prompt);
+    printf("%s",SHELL_PROMPT);
+
+    errno = 0;
     chars_read = getline(&line, &chars_to_read, stdin);
 
-    if (chars_read != -1){
-      puts(line);
-    }else{
-      if (errno != 0){
-        perror("Failed to read input line");
-      }
-      break;
+    if (errno < 0){
+      perror("Failed to read input line");
     }
-
     // Begin the forking
+
+    errno = 0;
     child_PID = fork();
 
     if (child_PID < 0){
       // no child process created, fork failed
-      perror("Process failed to fork");
-
-      //fclose(stdout); ?? //TODO they do share streams?
-      break;
+      perror("No child process, failed to fork");
 
     }else if (child_PID == 0){
-      //we are the child
-
       printf("I am the child. My childPID is %ld\n", (long)child_PID);
-
+      errno = 0;
       char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
       if(string_array == NULL){
         //TODO error message here!!!!
         // malloc sets errno!
+        perror("Child's malloc failed for string_array");
+        abort();
       }
 
       int ret_val = parse_args(line, string_array); 
       if(ret_val == -1){
         //TODO ERROR, LINE EXCEEDS MAX LENGTH
         //custom errors?
+        printf("%s\n.","Line exceeds max number of arguments: 100");
+        abort();
       }
-      
+
       errno = 0;
       int exec_return = execvp(*string_array,string_array);
       if (exec_return < 0) {
         perror("Failed to execute, error with command as inputted");
-        //exit(1); //TODO reflect on this exit bull shit. almost positive it's a no.
+        fclose(stdout); 
+        // I read you are supposed to close stdout if you use it in child,
+        // please let me know if this is false.
+        abort();
+
       }
       /*// delete this when done experimenting 17
         printf("Enter a random seed.n");
@@ -159,12 +159,10 @@ int run_shell() {
     }else {
       //we are the parent
       printf("I am the parent. My child's PID is %ld\n", (long)child_PID);
-      errno = 0; // TODO what do to with errno?
-
+      
+      errno = 0; 
       child_PID = wait(&status);
-
       // delete this when done experimenting
-      //
       if (child_PID == -1){ //Wait for child process.
         perror("wait error");
 
@@ -178,17 +176,14 @@ int run_shell() {
         else
           printf("Child process did not end normally.n");
       }
+      //END DELETE
       printf("Parent process ended.n");
 
     }
   } while (input_char != EOF);
     free(line);
 
-    if (errno == 0){
-      return 0;
-    }else{
-      return -1;
-    }
+    return 0;
 }
 
 CuSuite* ShellGetSuite() {
