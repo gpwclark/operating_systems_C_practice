@@ -12,7 +12,10 @@
 //TODO delete print statements and comments
 //TODO test on classroom.cs.unc.edu
 //TODO delete the code from web and make sure mine works.
-//TODO to more testing on parse_args with testing function including manually adding weird shit.
+//TODO to more testing on parse_args with testing function including manually adding weird symbols.
+//TODO read docs on execvp, what was it about slashes???
+//TODO should strtok be taking out all whitespace, or just spaces and tabs?
+//TODO get rid of testing code
 
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
