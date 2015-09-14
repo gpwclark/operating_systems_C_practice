@@ -11,10 +11,6 @@
 
 //TODO delete print statements and comments
 //TODO test on classroom.cs.unc.edu
-//TODO delete the code from web and make sure mine works.
-//TODO to more testing on parse_args with testing function including manually adding weird symbols.
-//TODO read docs on execvp, what was it about slashes???
-//TODO should strtok be taking out all whitespace, or just spaces and tabs?
 //TODO get rid of testing code
 
 int parse_args(char *raw_arg_string, char **string_array){
@@ -26,12 +22,11 @@ int parse_args(char *raw_arg_string, char **string_array){
   int i = 0;
   while( (token != NULL) && (i < MAX_ARGS)){ 
     string_array[i] = token; 
-    //printf("%s\n", string_array[i]);
     token = strtok(NULL, white_space_delim);
     ++i;
   }
 
-  if(i < 100){
+  if(i < MAX_ARGS){
     return 0;
   }else{
     return -1;
@@ -45,7 +40,7 @@ void test_run_shell(CuTest *tc) {
 
   string_array = (char**)malloc(MAX_ARGS * sizeof(char*));
   if(string_array == NULL){
-    printf("%s\n.", "malloc failed");
+    printf("%s\n", "malloc failed.");
   }
 
 
@@ -77,7 +72,6 @@ void test_run_shell(CuTest *tc) {
 
 int run_shell() {
   static const char SHELL_PROMPT[] = "% ";
-  //char *shell_prompt = "% ";
   char *line;
   size_t chars_to_read = 0;
   int chars_read;
@@ -86,10 +80,6 @@ int run_shell() {
   errno = 0; 
 
   int input_char;
-  //delete these when done experimenting 4
-  //int randomNumber, seed;  //DELETE ME
-  //char buffer[80]; //DELETE ME
-  //end delete 
 
   do {
     printf("%s",SHELL_PROMPT);
@@ -97,96 +87,80 @@ int run_shell() {
     errno = 0;
     chars_read = getline(&line, &chars_to_read, stdin);
 
+    int getline_failure = 0;
     if (errno < 0){
       perror("Failed to read input line");
+      getline_failure = -1;
     }
     // Begin the forking
-
-    errno = 0;
-    child_PID = fork();
-
-    if (child_PID < 0){
-      // no child process created, fork failed
-      perror("No child process, failed to fork");
-
-    }else if (child_PID == 0){
-      printf("I am the child. My childPID is %ld\n", (long)child_PID);
+    if(getline_failure == 0){
       errno = 0;
-      char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
-      if(string_array == NULL){
-        //TODO error message here!!!!
-        // malloc sets errno!
-        perror("Child's malloc failed for string_array");
-        abort();
-      }
+      child_PID = fork();
 
-      int ret_val = parse_args(line, string_array); 
-      if(ret_val == -1){
-        //TODO ERROR, LINE EXCEEDS MAX LENGTH
-        //custom errors?
-        printf("%s\n.","Line exceeds max number of arguments: 100");
-        abort();
-      }
+      if (child_PID < 0){
+        // no child process created, fork failed
+        perror("No child process, failed to fork");
 
-      errno = 0;
-      int exec_return = execvp(*string_array,string_array);
-      if (exec_return < 0) {
-        perror("Failed to execute, error with command as inputted");
-        fclose(stdout); 
-        // I read you are supposed to close stdout if you use it in child,
-        // please let me know if this is false.
-        abort();
-
-      }
-      /*// delete this when done experimenting 17
-        printf("Enter a random seed.n");
-        if(gets(buffer)) {
-        seed = atoi(buffer);
-        srand(seed);
+      }else if (child_PID == 0){
+        // printf("I am the child. My childPID is %ld\n", (long)child_PID);
+        errno = 0;
+        char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
+        if(string_array == NULL){
+          perror("Child's malloc failed for constructing the argument list");
+          abort();
         }
-        randomNumber = rand();
-        if ((randomNumber % 2) == 0) {
-        printf("Child process aborted; pid = %d.n", (int) child_PID);
-        abort();
-        fclose(stdout);
+
+        int ret_val = parse_args(line, string_array); 
+        if(ret_val == -1){
+          //ERROR, LINE EXCEEDS MAX LENGTH
+          printf("%s%d\n","Line exceeds max number of arguments: ", MAX_ARGS - 1);
+          abort();
         }
-        else {
-        printf("Child process ended normally; pid = %d.n", (int) child_PID);
-        exit(EXIT_SUCCESS);
+
+        errno = 0;
+        int exec_return = execvp(*string_array,string_array);
+        if (exec_return < 0) {
+          perror("Failed to execute, error with command as inputted");
+          fclose(stdout); 
+          // I read you are supposed to close stdout if you use it in child,
+          // please let me know if this is false.
+          abort();
+
         }
-      //end delete
-      */
 
-      free(string_array);
+        free(string_array);
 
-    }else {
-      //we are the parent
-      printf("I am the parent. My child's PID is %ld\n", (long)child_PID);
-      
-      errno = 0; 
-      child_PID = wait(&status);
-      // delete this when done experimenting
-      if (child_PID == -1){ //Wait for child process.
-        perror("wait error");
+      }else {
+        //we are the parent
+        //printf("I am the parent. My child's PID is %ld\n", (long)child_PID);
 
-      }  else { // Check Status 
-        if (WIFSIGNALED(status) != 0)
-          printf("Child process ended because of signal %d.n",
-              WTERMSIG(status));
-        else if (WIFEXITED(status) != 0)
-          printf("Child process ended normally; status = %d.n",
-              WEXITSTATUS(status));
-        else
-          printf("Child process did not end normally.n");
+        errno = 0; 
+        child_PID = wait(&status);
+        // delete this when done experimenting
+        if (child_PID == -1){ //Wait for child process.
+          perror("wait error");
+
+        } else{ 
+
+          if (WIFSIGNALED(status) != 0){
+            printf("%s\n","Child process terminated because of receipt of signal.");
+          } else if (WIFEXITED(status) != 0){
+            // printf("%s\n", "Child process terminated as expected.");
+          } else if(WIFSTOPPED(status != 0)){
+            printf("%s\n", "Child process stopped.");
+          } else{
+            printf("%s\n", "Child process terminated with error.");
+          }
+
+        }
+        //printf("%s\n","Parent process ended.");
+
       }
-      //END DELETE
-      printf("Parent process ended.n");
-
     }
-  } while (input_char != EOF);
-    free(line);
+  } while (chars_read != -1);
+  free(line);
 
-    return 0;
+  return 0;
 }
 
 CuSuite* ShellGetSuite() {
