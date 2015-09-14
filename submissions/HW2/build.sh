@@ -1,2 +1,2 @@
 #!/bin/bash
-gcc AllTests.c CuTest.c 530shell.c
+gcc 530shell.c
