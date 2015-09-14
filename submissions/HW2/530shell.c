@@ -1,6 +1,5 @@
-#include "CuTest.h"
-#include "AllTests.h"
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -32,43 +31,6 @@ int parse_args(char *raw_arg_string, char **string_array){
     return -1;
   }
 }
-
-void test_run_shell(CuTest *tc) {
-  int array_length;
-  char **string_array;
-  int ret_val;
-
-  string_array = (char**)malloc(MAX_ARGS * sizeof(char*));
-  if(string_array == NULL){
-    printf("%s\n", "malloc failed.");
-  }
-
-
-  array_length = 11;
-  char *input = "oi i'm an argument, parse me please" " look this is longer";
-  ret_val = parse_args(input, string_array); 
-  char *expected[] = {"oi", "i'm", "an", "argument,", "parse", "me", "please", "look", "this", "is", "longer"};
-  int i = 0;
-  printf("%s\n",*string_array);
-  while((i < array_length) && (ret_val != -1)){
-    CuAssertStrEquals(tc, expected[i], string_array[i]);
-    ++i;
-  }
-
-  array_length = 13;
-  input = "laksjdas dsaldkjsa dlsakjfal 0913  lkj l; jal sal s l			lk alks s";
-  ret_val = parse_args(input, string_array);
-  char *expected0[] = {"laksjdas", "dsaldkjsa", "dlsakjfal", "0913", "lkj", "l;", "jal", "sal", "s", "l", "lk", "alks", "s"};
-  i = 0;
-  while((i < array_length) && (ret_val != -1)){
-    CuAssertStrEquals(tc, expected0[i], string_array[i]);
-    ++i;
-  }
-
-  free(string_array);
-}
-
-
 
 int run_shell() {
   static const char SHELL_PROMPT[] = "% ";
@@ -163,21 +125,9 @@ int run_shell() {
   return 0;
 }
 
-CuSuite* ShellGetSuite() {
-  CuSuite* suite = CuSuiteNew();
-  SUITE_ADD_TEST(suite, test_run_shell);
-  return suite;
-}
-
 int main(int argc, char **argv) {
   int ret_val = 0;
 
-  if ( (argc == 2) && (strcmp(argv[1], "--test") == 0) ){
-    RunAllTests();
-
-  }else {
-    ret_val = run_shell();
-  }
-
+  ret_val = run_shell();
   return ret_val;
 }
