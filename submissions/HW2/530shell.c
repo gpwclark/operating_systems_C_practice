@@ -8,8 +8,14 @@
 
 #define MAX_ARGS 100
 
-//TODO delete print statements and comments
 //TODO test on classroom.cs.unc.edu
+
+/*
+ * This function takes as it's arguments the user inputted line as
+ * raw_arg_string and the string_array which has been allocated to hold up to
+ * MAX_ARGS. This function parses the line by whitespace and places the strings
+ * in memory.
+ */
 
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
@@ -18,6 +24,8 @@ int parse_args(char *raw_arg_string, char **string_array){
   token = strtok(new_string, white_space_delim);
 
   int i = 0;
+  // Loop terminates when the token strtok parses evaluates to NULL,
+  // indicating that the line of input is done parsing.
   while( (token != NULL) && (i < MAX_ARGS)){ 
     string_array[i] = token; 
     token = strtok(NULL, white_space_delim);
@@ -42,6 +50,10 @@ int run_shell() {
 
   int input_char;
 
+  /*
+   * This do while loop terminates when the return value for getline is -1, 
+   * indicating that the getline function has encountered the EOF.
+   */
   do {
     printf("%s",SHELL_PROMPT);
 
@@ -53,7 +65,12 @@ int run_shell() {
       perror("Failed to read input line");
       getline_failure = -1;
     }
-    // Begin the forking
+    /* 
+     * Begin the forking, if the PID is less than 0 then fork failed, if it
+     * is equivalent to 0 then running as child process, parse the input line 
+     * and execvp the command, else running as parent, wait() for child
+     * and report on status.
+     */
     if(getline_failure == 0){
       errno = 0;
       child_PID = fork();
@@ -83,8 +100,6 @@ int run_shell() {
         if (exec_return < 0) {
           perror("Failed to execute, error with command as inputted");
           fclose(stdout); 
-          // I read you are supposed to close stdout if you use it in child,
-          // please let me know if this is false.
           abort();
 
         }
@@ -97,7 +112,6 @@ int run_shell() {
 
         errno = 0; 
         child_PID = wait(&status);
-        // delete this when done experimenting
         if (child_PID == -1){ //Wait for child process.
           perror("wait error");
 
@@ -124,6 +138,10 @@ int run_shell() {
   return 0;
 }
 
+/*
+ * Main just serves to call run_shell, the function that sequentially reads lines, parses
+ * them and then execvps the line if it is valid, terminating when EOF is reached.
+ */
 int main(int argc, char **argv) {
   int ret_val = 0;
 
