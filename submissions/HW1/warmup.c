@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #define LINE_LENGTH 80
 
@@ -35,12 +36,13 @@ int perform_special_char_substitutions(int *buffer){
     }else{
       int ret_val = ungetc(temp_char,stdin);
 
+      //TODO DID THIS INTRODUCE A BUG?
       // If the return value is EOF then the stream is broken so I
       // free the buffer and exit with an error code.
-      if(ret_val == EOF){
-        free(buffer);
-        return -1;
-      }
+      //if(ret_val == EOF){
+      //  free(buffer);
+      //  return -1;
+      //}
     }
   }
   return 0;
@@ -100,8 +102,8 @@ int main() {
 
   int count = 0;
   do{
-    input_char = fgetc(stdin);
 
+    input_char = fgetc(stdin);
     if(is_valid_input(input_char)){
 
       input_char = perform_simple_char_substitutions(input_char);
@@ -114,7 +116,6 @@ int main() {
       }
 
       ++count;
-
       if(count == LINE_LENGTH){
         if(perform_special_char_substitutions(buffer) != 0){
           return -1;
@@ -127,6 +128,7 @@ int main() {
     }
 
   }while(input_char != EOF);
+
   free(buffer);
   return 0;
 }
