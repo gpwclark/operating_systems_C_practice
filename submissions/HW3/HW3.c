@@ -2,6 +2,10 @@
  * George Clark
  */ 
 
+//TODO write bash script to veryify each test case.
+//TODO fflush?
+//TODO honor pledge on ALL FILES
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +13,9 @@
 #include <ctype.h>
 
 #define LINE_LENGTH 80
+
+#include "st.h"
+#include "semaphore.h"
 
 /*
  * This function prints the buffer to stdout and appends
@@ -35,14 +42,6 @@ int perform_special_char_substitutions(int *buffer){
       buffer[LINE_LENGTH-1] = '^';
     }else{
       int ret_val = ungetc(temp_char,stdin);
-
-      //TODO DID THIS INTRODUCE A BUG?
-      // If the return value is EOF then the stream is broken so I
-      // free the buffer and exit with an error code.
-      //if(ret_val == EOF){
-      //  free(buffer);
-      //  return -1;
-      //}
     }
   }
   return 0;
