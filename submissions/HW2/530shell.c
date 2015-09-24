@@ -8,9 +8,7 @@
 
 #define MAX_ARGS 100
 
-//TODO test on classroom.cs.unc.edu
-
-/*
+/* I HAVE NEITHER GIVEN NOR RECEIVED HELP ON THIS PROGRAM - George Clark 720063665
  * This function takes as it's arguments the user inputted line as
  * raw_arg_string and the string_array which has been allocated to hold up to
  * MAX_ARGS. This function parses the line by whitespace and places the strings
