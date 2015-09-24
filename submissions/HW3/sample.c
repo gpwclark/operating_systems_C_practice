@@ -1,3 +1,5 @@
+// TODO BE AWARE OF INCLUDING THINGS TOO MANY TIMES
+
 // Standard includes
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,11 +25,20 @@
 #define THREAD_A_ID 'A'
 #define THREAD_B_ID 'B'
 
+//me define buffer size
+#define BUFFER_SIZE 80
+
 // Initialization data structure for our threads
 typedef struct {
 
     FILE *output_stream;        // Output target
+
+    //me set up the buffer semaphores and actual buffer
     semaphore *mutex;           // Pointer to a mutex
+    semaphore *emptyBuffers;
+    semaphore *fullBuffers;
+    int *buffer;
+
     char *shared_value_ptr;     // Pointer to a shared string
     char *last_set_by;          // Identifier of the thread who last set
 
@@ -36,7 +47,8 @@ typedef struct {
 // Prototypes for functions constituting execution of each thread.
 void *thread_a_func(void *state);
 void *thread_b_func(void *state);
-void *common_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime);
+void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextIn);
+void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextOut);
 
 /*
  * Create two threads using the ST library.
@@ -56,9 +68,20 @@ int main (int argc, char const *argv[]) {
     // Create char for last updater
     char last_set_by = THREAD_A_ID;
 
-    // Create and initialize a mutex to 1.
+    //me Create and initialize a mutex to 1.
     semaphore mutex;
+    semaphore emptyBuffers;
+    semaphore fullBuffers;
     createSem(&mutex, 1);
+    createSem(&emptyBuffers,BUFFER_SIZE);
+    createSem(&fullBuffers,0);
+
+    //me create buffer
+    int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
+    if (buffer == NULL){
+      //TODO error message?
+      return -1;
+    }
 
     // Set the file descriptor for output
     FILE *output_stream = DEFAULT_OUTPUT_STREAM;
@@ -67,6 +90,9 @@ int main (int argc, char const *argv[]) {
     ThreadInit init = {
         output_stream,
         &mutex,
+        &emptyBuffers,
+        &fullBuffers,
+        buffer, 
         shared_value,
         &last_set_by
     };
@@ -98,7 +124,10 @@ void *thread_a_func(void *state) {
     char thread_id = THREAD_A_ID;
     // The value that this thread wants to set
     char *my_msg = DEFAULT_MSG_A;
-    return common_logic(init, thread_id, my_msg, SLEEP_TIME_A);
+
+    //nextIn eval to 0
+    int nextIn = 0;
+    return producer_logic(init, thread_id, my_msg, SLEEP_TIME_A, nextIn);
 }
 
 // The execution path for threa d
@@ -110,13 +139,65 @@ void *thread_b_func(void *state) {
     char thread_id = THREAD_B_ID;
     // The value that this thread wants to set
     char *my_msg = DEFAULT_MSG_B;
-    return common_logic(init, thread_id, my_msg, SLEEP_TIME_B);
+    
+    //nextOut eval to 0
+    int nextOut = 0;
+
+    return consumer_logic(init, thread_id, my_msg, SLEEP_TIME_B, nextOut);
 }
 
 // The logic common to each thread: read the shared value and complain and update or celebrate.
-void *common_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime){
+void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextIn){
     int i;
     for (i=0; i < NUMBER_ITERATIONS; i++) {
+
+        //me producer logic?
+        down(init->emptyBuffers);
+        (init->buffer)[nextIn] = i;
+        nextIn = (nextIn + 1) % BUFFER_SIZE;
+        up(init->fullBuffers);
+
+        printf("%s: %d","I have produced", i);
+
+        // Acquire the mutex by decrementing it.
+        down(init->mutex);
+
+        // Read the shared value.
+        // If the thread sees anything but it's own value, it will complain.
+        // It will also change the shared value to its preferred value.
+        if (strncmp(init->shared_value_ptr, my_msg, MAX_LEN_SHARED_MSG) != 0) {
+            fprintf(init->output_stream, DEFAULT_DISAGREE_MSG, thread_id, *(init->last_set_by), my_msg);
+            strncpy(init->shared_value_ptr, my_msg, MAX_LEN_SHARED_MSG);
+            *(init->last_set_by) = thread_id;
+        } else { // Otherwise, the thread will indicate that it was right.
+            fprintf(init->output_stream, DEFAULT_AGREE_MSG, thread_id, init->shared_value_ptr);
+        }
+        // Either way, flush the output stream.
+        fflush(init->output_stream);
+
+        // Now release the mutex and sleep for some time.
+        up(init->mutex);
+        st_usleep(sleepTime);
+
+    }
+
+    // Finally, exit once NUMBER_ITERATIONS have been performed
+    st_thread_exit(NULL);
+}
+
+void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextOut){
+    int i;
+    int data;
+    for (i=0; i < NUMBER_ITERATIONS; i++) {
+      
+        //me consumer logic?
+        down(init->fullBuffers);
+        data = (init->buffer)[nextOut];
+        nextOut = nextOut % BUFFER_SIZE;
+        up(init->emptyBuffers);
+        
+        printf("%s: %d","I have consumed", data);
+
         // Acquire the mutex by decrementing it.
         down(init->mutex);
 
