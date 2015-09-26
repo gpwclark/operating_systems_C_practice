@@ -37,7 +37,7 @@ typedef struct {
     semaphore *mutex;           // Pointer to a mutex
     semaphore *emptyBuffers;
     semaphore *fullBuffers;
-    int *buffer;
+    int **buffer;
 
     char *shared_value_ptr;     // Pointer to a shared string
     char *last_set_by;          // Identifier of the thread who last set
@@ -76,8 +76,9 @@ int main (int argc, char const *argv[]) {
     createSem(&emptyBuffers,BUFFER_SIZE);
     createSem(&fullBuffers,0);
 
-    //me create buffer
-    int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
+    //me create buffe
+    //TODO FREE THE BUFFER< FREE IT >
+    int **buffer = (int**)malloc(sizeof(int*) * BUFFER_SIZE); 
     if (buffer == NULL){
       //TODO error message?
       return -1;
@@ -127,7 +128,7 @@ void *thread_a_func(void *state) {
 
     //nextIn eval to 0
     int nextIn = 0;
-    return producer_logic(init, thread_id, my_msg, SLEEP_TIME_A, nextIn);
+    return producer_logic(init, thread_id, my_msg, SLEEP_TIME_A, nextIn);      
 }
 
 // The execution path for threa d
@@ -153,11 +154,13 @@ void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
 
         //me producer logic?
         down(init->emptyBuffers);
-        (init->buffer)[nextIn] = i;
+        (init->buffer[nextIn]) = &i;
         nextIn = (nextIn + 1) % BUFFER_SIZE;
         up(init->fullBuffers);
+        
+        int *data = (init->buffer[nextIn]);
 
-        printf("%s: %d","I have produced", i);
+        printf("%s: %d, %s: %d ","I have produced",i,"the value",data);//(init->buffer[nextIn]));
 
         // Acquire the mutex by decrementing it.
         down(init->mutex);
@@ -187,16 +190,16 @@ void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
 
 void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextOut){
     int i;
-    int data;
+    int *data;
     for (i=0; i < NUMBER_ITERATIONS; i++) {
       
         //me consumer logic?
         down(init->fullBuffers);
-        data = (init->buffer)[nextOut];
+        data = (init->buffer[nextOut]);
         nextOut = nextOut % BUFFER_SIZE;
         up(init->emptyBuffers);
         
-        printf("%s: %d","I have consumed", data);
+        printf("%s: %d, %s: %d ","I have consumed", *data,"the value",(init->buffer[nextOut]));
 
         // Acquire the mutex by decrementing it.
         down(init->mutex);
