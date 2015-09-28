@@ -44,7 +44,7 @@ typedef struct {
     semaphore *mutex;           // Pointer to a mutex
     semaphore *emptyBuffers;
     semaphore *fullBuffers;
-    int **buffer;
+    int *buffer;
 
     char *shared_value_ptr;     // Pointer to a shared string
     char *last_set_by;          // Identifier of the thread who last set
@@ -85,7 +85,7 @@ int main (int argc, char const *argv[]) {
 
     //me create buffe
     //TODO FREE THE BUFFER< FREE IT >
-    int **buffer = (int**)malloc(sizeof(int*) * BUFFER_SIZE); 
+    int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
     if (buffer == NULL){
       //TODO error message?
       return -1;
@@ -157,7 +157,7 @@ void *thread_b_func(void *state) {
 // The logic common to each thread: read the shared value and complain and update or celebrate.
 void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextIn){
     int i;
-    int *data;
+    int data;
     int value;
     for (i=0; i < NUMBER_ITERATIONS; i++) {
 
@@ -167,10 +167,10 @@ void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
         blocked = 1;
         value = rand();
         value = value % 100;
-        (init->buffer[nextIn]) = &value;
+        (init->buffer[nextIn]) = value;
         data = (init->buffer[nextIn]);
         nextIn = (nextIn + 1) % BUFFER_SIZE;
-        printf("%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",*data,"my val",value,"i", i,"nextIn",nextIn);
+        printf("%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
         up(init->fullBuffers);
 
         if (blocked == 0){
@@ -211,7 +211,7 @@ void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
 
 void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextOut){
     int i;
-    int *data;
+    int data;
     for (i=0; i < NUMBER_ITERATIONS; i++) {
       
         //me consumer logic?
@@ -220,7 +220,7 @@ void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
         blocked = 1;
         data = (init->buffer[nextOut]);
         nextOut = (nextOut + 1) % BUFFER_SIZE;
-        printf("%s: %d, %s: %d, %s: %d\n","I have consumed", *data,"i", i,"nextOut",nextOut);
+        printf("%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
         up(init->emptyBuffers);
 
         if (blocked == 0){
