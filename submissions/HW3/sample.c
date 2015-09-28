@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h> //TODO take this out when done with texting
 
 // Library and custom includes
 #include "st.h"
@@ -11,16 +12,21 @@
 
 // Output-related defaults (stream, message, shared value length)
 #define DEFAULT_OUTPUT_STREAM stdout
-#define DEFAULT_AGREE_MSG "[thread %c]: See? Homework is %s!\n"
-#define DEFAULT_DISAGREE_MSG "[thread %c]: Thread %c is lame. Homework is %s!\n"
+#define DEFAULT_AGREE_MSG "                                    [thread %c]: See? Homework is %s!\n"
+#define DEFAULT_DISAGREE_MSG "                                 [thread %c]: Thread %c is lame. Homework is %s!\n"
 #define DEFAULT_MSG_A "great\0"
 #define DEFAULT_MSG_B "boring\0"
 #define MAX_LEN_SHARED_MSG 12
 // How many times to iterate in each thread.
-#define NUMBER_ITERATIONS 10
+#define NUMBER_ITERATIONS 15
 // Sleep time for each thread in microseconds.
+/*
 #define SLEEP_TIME_A 333333          
 #define SLEEP_TIME_B 666666
+*/
+#define SLEEP_TIME_A 333333
+#define SLEEP_TIME_B 666666 
+
 // Thread identifiers
 #define THREAD_A_ID 'A'
 #define THREAD_B_ID 'B'
@@ -29,6 +35,7 @@
 #define BUFFER_SIZE 80
 
 // Initialization data structure for our threads
+//TODO 
 typedef struct {
 
     FILE *output_stream;        // Output target
@@ -60,7 +67,7 @@ int main (int argc, char const *argv[]) {
 
     // Initialize the libST runtime.
     st_init();
-
+    srand(time(NULL));
     // Create space for a MAX_LEN_SHARED_MSG-character string.
     char shared_value[MAX_LEN_SHARED_MSG];
     strncpy(shared_value, DEFAULT_MSG_A, MAX_LEN_SHARED_MSG);
@@ -150,18 +157,31 @@ void *thread_b_func(void *state) {
 // The logic common to each thread: read the shared value and complain and update or celebrate.
 void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t sleepTime, int nextIn){
     int i;
+    int *data;
+    int value;
     for (i=0; i < NUMBER_ITERATIONS; i++) {
 
-        //me producer logic?
+        // me producer logic?
+        int blocked = 0;
         down(init->emptyBuffers);
-        (init->buffer[nextIn]) = &i;
+        blocked = 1;
+        value = rand();
+        value = value % 100;
+        (init->buffer[nextIn]) = &value;
+        data = (init->buffer[nextIn]);
         nextIn = (nextIn + 1) % BUFFER_SIZE;
+        printf("%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",*data,"my val",value,"i", i,"nextIn",nextIn);
         up(init->fullBuffers);
+
+        if (blocked == 0){
+          printf("THREAD A blocked\n");
+        }else{
+          printf("THREAD A ran\n");
+        }
+        blocked = 0;
         
-        int *data = (init->buffer[nextIn]);
 
-        printf("%s: %d, %s: %d ","I have produced",i,"the value",data);//(init->buffer[nextIn]));
-
+/*
         // Acquire the mutex by decrementing it.
         down(init->mutex);
 
@@ -180,6 +200,7 @@ void *producer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
 
         // Now release the mutex and sleep for some time.
         up(init->mutex);
+  */
         st_usleep(sleepTime);
 
     }
@@ -194,14 +215,23 @@ void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
     for (i=0; i < NUMBER_ITERATIONS; i++) {
       
         //me consumer logic?
+        int blocked = 0;
         down(init->fullBuffers);
+        blocked = 1;
         data = (init->buffer[nextOut]);
-        nextOut = nextOut % BUFFER_SIZE;
+        nextOut = (nextOut + 1) % BUFFER_SIZE;
+        printf("%s: %d, %s: %d, %s: %d\n","I have consumed", *data,"i", i,"nextOut",nextOut);
         up(init->emptyBuffers);
-        
-        printf("%s: %d, %s: %d ","I have consumed", *data,"the value",(init->buffer[nextOut]));
 
+        if (blocked == 0){
+          printf("THREAD B blocked\n");
+        }else{
+          printf("THREAD B ran\n");
+        }
+        
+        blocked = 0;
         // Acquire the mutex by decrementing it.
+  /*
         down(init->mutex);
 
         // Read the shared value.
@@ -219,6 +249,7 @@ void *consumer_logic(ThreadInit *init, char thread_id, char *my_msg, st_utime_t 
 
         // Now release the mutex and sleep for some time.
         up(init->mutex);
+    */
         st_usleep(sleepTime);
 
     }
