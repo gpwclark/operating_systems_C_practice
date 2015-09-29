@@ -1,5 +1,5 @@
-#ifndef THREAD_INST_GUARD
-#define THREAD_INST_GUARD
+#ifndef SEM_CONDITIONALS_GUARD 
+#define SEM_CONDITIONALS_GUARD
 
 #include "semaphore.h"
 #include <stdio.h>
@@ -8,7 +8,6 @@ typedef struct {
     FILE *out_stream;
     semaphore *emptyBuffers;
     semaphore *fullBuffers;
-    int *buffer;
-}Thread_inst;
+}sem_conditionals;
 
 #endif

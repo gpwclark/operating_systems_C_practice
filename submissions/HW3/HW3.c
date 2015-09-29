@@ -1,6 +1,6 @@
 // TODO BE AWARE OF INCLUDING THINGS TOO MANY TIMES
-/* This class uses a struct, Thread_inst, this struct is passed to it's two 
- * functions, the Thread_inst should really be local, because it shouldn't be
+/* This class uses a struct, sem_conditionals, this struct is passed to it's two 
+ * functions, the sem_conditionals should really be local, because it shouldn't be
  * passed in. On the other hand. When this buffer class is created, deposit
  * will take an int (a char from stdin but it's an int of course) and use
  * that instead of rand, and remoove will return an int. That's the only thing
@@ -15,7 +15,7 @@
 // TODO Think critically about asserts... later
 // TODO need good semantics so that one thread knows
 //      it is the producer or the consumer and will call deposit or remove
-//TODO separate out buffer and thread_inst (which should be a semaphore instead)
+//TODO separate out buffer and sem_conditionals (which should be a semaphore instead)
 
 #include <time.h> //TODO take this out when done with testing
 #include <string.h>
@@ -26,7 +26,7 @@
 //includes for the ST library in CORRECT ORDER, DO NOT REARRANGE
 #include "st.h"
 //#include "semaphore.h"
-#include "Thread_inst.h"
+#include "sem_conditionals.h"
 #include "buffer.h"
 
 //TODO GET THIS OUT OF HERE
@@ -51,61 +51,60 @@ int perform_simple_char_substitutions(char character){
   return character;
 }
 
-void *print_char_buffer(Thread_inst *thread){
+void *print_char_buffer(synced_buffer *s_buf){
   int character;
   do{
-    character = remoove(thread);
+    character = remoove(s_buf);
     character = perform_simple_char_substitutions(character);
     printf("%d : %c\n",character, character);
   } while (character != EOF);
   st_thread_exit(NULL);
 }
 
-void *get_char_stdin(Thread_inst *thread){
+void *get_char_stdin(synced_buffer *s_buf){
   int input_char;
   do{
     input_char = fgetc(stdin);
-    deposit(thread,input_char);
+    deposit(s_buf, input_char);
   } while (input_char != EOF);
   st_thread_exit(NULL);
 }
 
 // init for print fcn
-void *print_char_buffer_init(void *init_thread_state) {
-    Thread_inst *thread = init_thread_state;
-    return print_char_buffer(thread);
+void *print_char_buffer_init(void *init_buf_state) {
+    synced_buffer *s_buf = init_buf_state;
+    return print_char_buffer(s_buf);
 }
 // init for get char stdin
-void *get_char_stdin_init(void *init_thread_state) {
- 
-    Thread_inst *thread = init_thread_state;
-    return get_char_stdin(thread);
+void *get_char_stdin_init(void *init_buf_state) {
+    synced_buffer *s_buf = init_buf_state;
+    return get_char_stdin(s_buf);
 }
 
 int main () {
 
     st_init();
 
-    // must free the shared_buffer
-    Thread_inst *shared_buffers = buffer_init();
-    if (shared_buffers == NULL){
+    synced_buffer *s_buf = buffer_init();
+    if (s_buf == NULL){
       printf("Failed to allocate memory for buffer ADT");
     }
 
     // Producer Thread 
-    if (st_thread_create(get_char_stdin_init, shared_buffers, 0, 0) == NULL) {
+    if (st_thread_create(get_char_stdin_init, s_buf, 0, 0) == NULL) {
         perror("Producer thread not spawned: st_thread_create() has failed");
         abort();
     }
 
     // Consumer Thread
-    if (st_thread_create(print_char_buffer_init, shared_buffers, 0, 0) == NULL) {
+    if (st_thread_create(print_char_buffer_init, s_buf, 0, 0) == NULL) {
         perror("Consumer thread not spawned: st_thread_create() has failed");
         abort();
     }
 
     st_thread_exit(NULL);
-    free(shared_buffers);
+    //TODO since this never gets called, free the buffer elsewhere?
+    free(s_buf);
     printf("I'm done!!");
 
     return 0;

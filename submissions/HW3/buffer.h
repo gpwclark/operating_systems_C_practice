@@ -1,6 +1,11 @@
 #include <semaphore.h>
-#include "Thread_inst.h"
+#include "sem_conditionals.h"
 
-void deposit(Thread_inst *thread, int value);
-int remoove(Thread_inst *thread);
-Thread_inst *buffer_init();
+typedef struct {
+  int *buffer;
+  sem_conditionals *sems;
+} synced_buffer;
+
+void deposit(synced_buffer *s_buf, int value);
+int remoove(synced_buffer *s_buf);
+synced_buffer *buffer_init();

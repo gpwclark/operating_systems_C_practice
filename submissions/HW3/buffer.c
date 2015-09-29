@@ -1,7 +1,7 @@
 // TODO BE AWARE OF INCLUDING THINGS TOO MANY TIMES
 // TODO COMMENT YOUR CODE BUDDY!!!!!!!!!!
-/* This class uses a struct, Thread_inst, this struct is passed to it's two 
- * functions, the Thread_inst should really be local, because it shouldn't be
+/* This class uses a struct, sem_conditionals, this struct is passed to it's two 
+ * functions, the sem_conditionals should really be local, because it shouldn't be
  * passed in. On the other hand. When this buffer class is created, deposit
  * will take an int (a char from stdin but it's an int of course) and use
  * that instead of rand, and remoove will return an int. That's the only thing
@@ -14,7 +14,7 @@
 // TODO MUST FREE RET VAL OF INIT!!!!
 // TODO remove output stream
 // TODO finalize the buffer.h
-// TODO RENAME THREAD_INST STRUCT, it should be the buffer ADT I think.
+// TODO RENAME sem_conditionals STRUCT, it should be the buffer ADT I think.
 // TODO Think critically about asserts... later
 // TODO need good semantics so that one thread knows
 //      it is the producer or the consumer and will call deposit or remove
@@ -45,95 +45,101 @@
  */
 #define BUFFER_SIZE 200
 
-void deposit(Thread_inst *thread, int value){
+void deposit(synced_buffer *s_buf, int value){
   int i;
   int data;
   //int value;
   int nextIn = 0;
   //st_utime_t sleepTime =  SLEEP_TIME_P;
 
-  fprintf(thread->out_stream, "\n%s: %d\n","1 prod INIT - emptyBuffers",thread->emptyBuffers->value); 
-  down(thread->emptyBuffers);
-  fprintf(thread->out_stream, "PRODUCER\n");
-  fprintf(thread->out_stream, "%s: %d\n","2 p emptyBuffers",thread->emptyBuffers->value);
-  //assert(thread->emptyBuffers->value > 0);
+  fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 prod INIT - emptyBuffers",s_buf->sems->emptyBuffers->value); 
+  down(s_buf->sems->emptyBuffers);
+  fprintf(s_buf->sems->out_stream, "PRODUCER\n");
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","2 p emptyBuffers",s_buf->sems->emptyBuffers->value);
+  //assert(s_buf->sems->emptyBuffers->value > 0);
 
   //value = rand();
   //value = value % 100;
-  (thread->buffer[nextIn]) = value;
-  data = (thread->buffer[nextIn]);
+  (s_buf->buffer[nextIn]) = value;
+  data = (s_buf->buffer[nextIn]);
   nextIn = (nextIn + 1) % BUFFER_SIZE;
-  fprintf(thread->out_stream, "%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
+  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
 
-  fprintf(thread->out_stream, "%s: %d\n","3 p fullBuffers",thread->fullBuffers->value);
-  up(thread->fullBuffers);
-  //assert(thread->fullBuffers->value > 0);
-  fprintf(thread->out_stream, "%s: %d\n","4 p fullBuffers",thread->fullBuffers->value);
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","3 p fullBuffers",s_buf->sems->fullBuffers->value);
+  up(s_buf->sems->fullBuffers);
+  //assert(s_buf->sems->fullBuffers->value > 0);
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","4 p fullBuffers",s_buf->sems->fullBuffers->value);
   // assert?
-  fflush(thread->out_stream);
+  fflush(s_buf->sems->out_stream);
 
   // st_usleep(sleepTime);
 }
 
-int remoove(Thread_inst *thread){
+int remoove(synced_buffer *s_buf){
   int i;
   int data;
   int nextOut = 0;
   //st_utime_t sleepTime =  SLEEP_TIME_C;
 
-  fprintf(thread->out_stream, "\n%s: %d\n","1 cons INIT - fullBuffers",thread->fullBuffers->value);
-  down(thread->fullBuffers);
-  fprintf(thread->out_stream, "CONSUMER\n");
-  fprintf(thread->out_stream, "%s: %d\n","2 c fullBuffers",thread->fullBuffers->value);
-  //assert(thread->fullBuffers->value > 0);
+  fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 cons INIT - fullBuffers",s_buf->sems->fullBuffers->value);
+  down(s_buf->sems->fullBuffers);
+  fprintf(s_buf->sems->out_stream, "CONSUMER\n");
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","2 c fullBuffers",s_buf->sems->fullBuffers->value);
+  //assert(s_buf->sems->fullBuffers->value > 0);
 
-  data = (thread->buffer[nextOut]);
+  data = (s_buf->buffer[nextOut]);
   nextOut = (nextOut + 1) % BUFFER_SIZE;
-  fprintf(thread->out_stream, "%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
+  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
 
-  fprintf(thread->out_stream, "%s: %d\n","3 c emptyBuffers",thread->emptyBuffers->value);
-  up(thread->emptyBuffers);
-  fprintf(thread->out_stream, "%s: %d\n","4 c emptyBuffers",thread->emptyBuffers->value);
-  //assert(thread->emptyBuffers->value > 0);
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","3 c emptyBuffers",s_buf->sems->emptyBuffers->value);
+  up(s_buf->sems->emptyBuffers);
+  fprintf(s_buf->sems->out_stream, "%s: %d\n","4 c emptyBuffers",s_buf->sems->emptyBuffers->value);
+  //assert(s_buf->sems->emptyBuffers->value > 0);
   // assert?
 
-  fflush(thread->out_stream);
+  fflush(s_buf->sems->out_stream);
   //st_usleep(sleepTime);
 
   return data;
 }
 
-Thread_inst *buffer_init(){
+synced_buffer *buffer_init(){
+
   semaphore *emptyBuffers = (semaphore*) malloc(sizeof(semaphore));
   semaphore *fullBuffers = (semaphore*) malloc(sizeof(semaphore));
-  /*
-  semaphore emptyBuffers;
-  semaphore fullBuffers;
-  */
-
   createSem(emptyBuffers,BUFFER_SIZE);
   createSem(fullBuffers,0);
 
   FILE *out_stream = DEF_OUT_STREAM;
+  
+  //TODO does this need to be malloced since it is going into synced buffer?
+  sem_conditionals *sems = (sem_conditionals*) malloc(sizeof(sem_conditionals));
+  if(sems == NULL){
+    //return null if malloc fails
+    return NULL;
+  }
+
+  sems->out_stream = out_stream;  
+  sems->emptyBuffers = emptyBuffers;
+  sems->fullBuffers = fullBuffers;
 
   //me create buffer, and check for errrors.
   int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
   if (buffer == NULL){
     //TODO what is EXIT_FAILURE?
-    exit(EXIT_FAILURE);
+    // exit(EXIT_FAILURE);
+    return NULL;
   }
 
-  Thread_inst *shared_buffers = (Thread_inst*) malloc(sizeof(Thread_inst));
-  if(buffer == NULL){
+  synced_buffer *sync_buf = (synced_buffer*) malloc(sizeof(synced_buffer));
+  if(sync_buf == NULL){
     //return null if malloc fails
     return NULL;
   }
 
-  shared_buffers->out_stream = out_stream;  
-  shared_buffers->emptyBuffers = emptyBuffers;
-  shared_buffers->fullBuffers = fullBuffers;
-  shared_buffers->buffer = buffer;
+  sync_buf->buffer = buffer;
+  sync_buf->sems = sems;
   
   //*shared_buffers = local_buffers;
-  return shared_buffers;
+  return sync_buf;
 }
