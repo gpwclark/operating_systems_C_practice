@@ -1,10 +1,24 @@
 // TODO BE AWARE OF INCLUDING THINGS TOO MANY TIMES
-// TODO put in asserts!!
-// TODO do these need to be renamed deposit and remove? it appears that main 
-// is definitely not necessary here, plus this file will need to be shared
-// between threads so we need good semantics so that one thread knows
-// it is the producer or the consumer and will call deposit or remove
-// etc.etc.etc.etc
+// TODO COMMENT YOUR CODE BUDDY!!!!!!!!!!
+/* This class uses a struct, Thread_inst, this struct is passed to it's two 
+ * functions, the Thread_inst should really be local, because it shouldn't be
+ * passed in. On the other hand. When this buffer class is created, deposit
+ * will take an int (a char from stdin but it's an int of course) and use
+ * that instead of rand, and remoove will return an int. That's the only thing
+ * that this class is used for.
+ *
+ * (buffer->deposit(char));
+ * int char = (buffer->remoove());
+ */
+// TODO turn main into init function
+// TODO MUST FREE RET VAL OF INIT!!!!
+// TODO remove output stream
+// TODO finalize the buffer.h
+// TODO RENAME THREAD_INST STRUCT, it should be the buffer ADT I think.
+// TODO Think critically about asserts... later
+// TODO need good semantics so that one thread knows
+//      it is the producer or the consumer and will call deposit or remove
+//TODO get rid of all comments
 
 #include <time.h> //TODO take this out when done with testing
 #include <string.h>
@@ -14,15 +28,16 @@
 
 //includes for the ST library in CORRECT ORDER, DO NOT REARRANGE
 #include "st.h"
-#include "semaphore.h"
+#include "buffer.h"
+//#include "semaphore.h" included in buffer.h
 
 //TODO GET THIS OUT OF HERE
-#define NUMBER_ITERATIONS 15
+#define DEF_OUT_STREAM stderr
 
 // Sleep time for each thread in microseconds.
 // TODO GET THIS OUT OF HERE TOOOOO
-#define SLEEP_TIME_P 2
-#define SLEEP_TIME_C 555
+#define SLEEP_TIME_C 222
+#define SLEEP_TIME_P 666
 
 /* me define buffer size to be sufficiently large, if producer runs much more 
  * than the consumuer, we could have a situation where the producer is waiting
@@ -30,111 +45,95 @@
  */
 #define BUFFER_SIZE 200
 
-typedef struct {
-    semaphore *emptyBuffers;
-    semaphore *fullBuffers;
-    int *buffer;
-}Thread_init;
+void deposit(Thread_inst *thread, int value){
+  int i;
+  int data;
+  //int value;
+  int nextIn = 0;
+  //st_utime_t sleepTime =  SLEEP_TIME_P;
 
+  fprintf(thread->out_stream, "\n%s: %d\n","1 prod INIT - emptyBuffers",thread->emptyBuffers->value); 
+  down(thread->emptyBuffers);
+  fprintf(thread->out_stream, "PRODUCER\n");
+  fprintf(thread->out_stream, "%s: %d\n","2 p emptyBuffers",thread->emptyBuffers->value);
+  //assert(thread->emptyBuffers->value > 0);
 
-void producer(Thread_init *init, st_utime_t sleepTime, int nextIn){
-    int i;
-    int data;
-    int value;
-    for (i=0; i < NUMBER_ITERATIONS; i++) {
+  //value = rand();
+  //value = value % 100;
+  (thread->buffer[nextIn]) = value;
+  data = (thread->buffer[nextIn]);
+  nextIn = (nextIn + 1) % BUFFER_SIZE;
+  fprintf(thread->out_stream, "%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
 
-        down(init->emptyBuffers);
-        // assert?
-        value = rand();
-        value = value % 100;
-        (init->buffer[nextIn]) = value;
-        data = (init->buffer[nextIn]);
-        nextIn = (nextIn + 1) % BUFFER_SIZE;
-        printf("%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
-        // assert?
-        up(init->fullBuffers);
-        // assert?
+  fprintf(thread->out_stream, "%s: %d\n","3 p fullBuffers",thread->fullBuffers->value);
+  up(thread->fullBuffers);
+  //assert(thread->fullBuffers->value > 0);
+  fprintf(thread->out_stream, "%s: %d\n","4 p fullBuffers",thread->fullBuffers->value);
+  // assert?
+  fflush(thread->out_stream);
 
-        st_usleep(sleepTime);
-    }
-
-    st_thread_exit(NULL);
+  // st_usleep(sleepTime);
 }
 
-void consumer(Thread_init *init, st_utime_t sleepTime, int nextOut){
-    int i;
-    int data;
-    for (i=0; i < NUMBER_ITERATIONS; i++) {
-      
-        down(init->fullBuffers);
-        // assert?
-        data = (init->buffer[nextOut]);
-        nextOut = (nextOut + 1) % BUFFER_SIZE;
-        printf("%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
-        // assert?
-        up(init->emptyBuffers);
-        // assert?
-        st_usleep(sleepTime);
-    }
+int remoove(Thread_inst *thread){
+  int i;
+  int data;
+  int nextOut = 0;
+  //st_utime_t sleepTime =  SLEEP_TIME_C;
 
-    st_thread_exit(NULL);
+  fprintf(thread->out_stream, "\n%s: %d\n","1 cons INIT - fullBuffers",thread->fullBuffers->value);
+  down(thread->fullBuffers);
+  fprintf(thread->out_stream, "CONSUMER\n");
+  fprintf(thread->out_stream, "%s: %d\n","2 c fullBuffers",thread->fullBuffers->value);
+  //assert(thread->fullBuffers->value > 0);
+
+  data = (thread->buffer[nextOut]);
+  nextOut = (nextOut + 1) % BUFFER_SIZE;
+  fprintf(thread->out_stream, "%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
+
+  fprintf(thread->out_stream, "%s: %d\n","3 c emptyBuffers",thread->emptyBuffers->value);
+  up(thread->emptyBuffers);
+  fprintf(thread->out_stream, "%s: %d\n","4 c emptyBuffers",thread->emptyBuffers->value);
+  //assert(thread->emptyBuffers->value > 0);
+  // assert?
+
+  fflush(thread->out_stream);
+  //st_usleep(sleepTime);
+
+  return data;
 }
 
-void *producer_init(void *init_thread_state) {
-    Thread_init *init = init_thread_state;
+Thread_inst *buffer_init(){
+  semaphore *emptyBuffers = (semaphore*) malloc(sizeof(semaphore));
+  semaphore *fullBuffers = (semaphore*) malloc(sizeof(semaphore));
+  /*
+  semaphore emptyBuffers;
+  semaphore fullBuffers;
+  */
 
-    //nextIn eval to 0
-    int nextIn = 0;
-    producer(init, SLEEP_TIME_P, nextIn);      
-}
+  createSem(emptyBuffers,BUFFER_SIZE);
+  createSem(fullBuffers,0);
 
-void *consumer_init(void *init_thread_state) {
- 
-    Thread_init *init = init_thread_state;
-    //nextOut eval to 0
-    int nextOut = 0;
+  FILE *out_stream = DEF_OUT_STREAM;
 
-    consumer(init, SLEEP_TIME_C, nextOut);
-}
+  //me create buffer, and check for errrors.
+  int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
+  if (buffer == NULL){
+    //TODO what is EXIT_FAILURE?
+    exit(EXIT_FAILURE);
+  }
 
-int main (int argc, char const *argv[]) {
+  Thread_inst *shared_buffers = (Thread_inst*) malloc(sizeof(Thread_inst));
+  if(buffer == NULL){
+    //return null if malloc fails
+    return NULL;
+  }
 
-    st_init();
-    //TODO when done debugging take this out
-    srand(time(NULL));
-
-    semaphore emptyBuffers;
-    semaphore fullBuffers;
-    createSem(&emptyBuffers,BUFFER_SIZE);
-    createSem(&fullBuffers,0);
-
-    //me create buffer, and check for errrors.
-    int *buffer = (int*)malloc(sizeof(int) * BUFFER_SIZE); 
-    if (buffer == NULL){
-      //TODO error message?
-      return -1;
-    }
-
-    Thread_init shared_buffers = {
-        &emptyBuffers,
-        &fullBuffers,
-        buffer, 
-    };
-
-    // Producer Thread 
-    if (st_thread_create(producer_init, &shared_buffers, 0, 0) == NULL) {
-        perror("Producer thread not spawned: st_thread_create() has failed");
-        abort();
-    }
-
-    // Consumer Thread
-    if (st_thread_create(consumer_init, &shared_buffers, 0, 0) == NULL) {
-        perror("Consumer thread not spawned: st_thread_create() has failed");
-        abort();
-    }
-
-    st_thread_exit(NULL);
-    free(buffer);
-
-    return 0;
+  shared_buffers->out_stream = out_stream;  
+  shared_buffers->emptyBuffers = emptyBuffers;
+  shared_buffers->fullBuffers = fullBuffers;
+  shared_buffers->buffer = buffer;
+  
+  //*shared_buffers = local_buffers;
+  return shared_buffers;
 }

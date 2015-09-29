@@ -1,3 +1,6 @@
+#ifndef SEMAPHORE_GUARD
+#define SEMAPHORE_GUARD
+
 typedef struct 
 {
   int value;
@@ -7,3 +10,5 @@ typedef struct
 void down(semaphore *s);
 void up(semaphore *s);
 void createSem(semaphore *s, int value);
+
+#endif
