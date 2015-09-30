@@ -9,6 +9,19 @@
 // TODO make sure all memory is cleared AND check for malloc fails
 // TODO VERIFY THERE ARE NO CONSTANTS
 
+
+
+
+
+//TODO experiment with deposit and remoove hard core. 
+//try diff ways of intializing nextIn and nextOut
+
+
+
+
+
+
+
 #include <time.h> //TODO take this out when done with testing
 #include <string.h>
 #include <stdio.h>
@@ -133,7 +146,7 @@ void *hybrid(void *init_hybrid_buf){
   int input_char1;
   do{
     input_char = remoove(hybrid_buf->s_buf_cons);
-    printf("out: %c",input_char);
+    //printf("out: %c",input_char);
     input_char = (*(hybrid_buf->function_ptr))(input_char);
 
 
@@ -188,7 +201,7 @@ void *producer(void *init_prod_buf){
   do{
     input_char = (*(prod_buf->function_ptr))(input_char);
     deposit(prod_buf->s_buf, input_char);
-    printf("in: %c",input_char);
+    //printf("in: %c",input_char);
   } while (input_char != EOF);
   st_thread_exit(NULL);
 }
@@ -235,18 +248,18 @@ int main () {
   
   // Relation 1
   producer_buffer *prod_buf = (producer_buffer*)malloc(sizeof(producer_buffer));
-  hybrid_buffer *hybrid_buf_a = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
+  //hybrid_buffer *hybrid_buf_a = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
 
   prod_buf->s_buf = s_buf_1;
-  hybrid_buf_a->s_buf_cons = s_buf_1;
+  //hybrid_buf_a->s_buf_cons = s_buf_1;
 
   prod_buf->function_ptr = fcn_ptr[0];
-  hybrid_buf_a->function_ptr = fcn_ptr[1];
+  //hybrid_buf_a->function_ptr = fcn_ptr[1];
   
   // Relation 2
   //hybrid_buffer *hybrid_buf_b = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
 
-  hybrid_buf_a->s_buf_prod = s_buf_2;
+  //hybrid_buf_a->s_buf_prod = s_buf_2;
   /*hybrid_buf_b->s_buf_cons = s_buf_2;
 
   hybrid_buf_b->function_ptr = fcn_ptr[2];
@@ -267,19 +280,19 @@ int main () {
   
   //cons_buf->s_buf = s_buf_4;
   // ABOVE VAL FOR CONS IS CORRECT
-  cons_buf->s_buf = s_buf_2;
+  cons_buf->s_buf = s_buf_1;
   cons_buf->function_ptr = fcn_ptr[4];
 
   if (st_thread_create(producer, prod_buf, 0, 0) == NULL) {
     perror("Producer thread not spawned: st_thread_create() has failed");
     abort();
   }
+/*
   if (st_thread_create(hybrid, hybrid_buf_a, 0, 0) == NULL) {
     perror("Consumer thread not spawned: st_thread_create() has failed");
     abort();
   }
 
-/*
   if (st_thread_create(hybrid, hybrid_buf_b, 0, 0) == NULL) {
     perror("Consumer thread not spawned: st_thread_create() has failed");
     abort();
