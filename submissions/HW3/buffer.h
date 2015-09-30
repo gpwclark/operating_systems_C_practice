@@ -4,6 +4,8 @@
 typedef struct {
   int *buffer;
   sem_conditionals *sems;
+  int nextIn;
+  int nextOut;
 } synced_buffer;
 
 void deposit(synced_buffer *s_buf, int value);

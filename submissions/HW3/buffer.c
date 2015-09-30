@@ -53,7 +53,6 @@ void deposit(synced_buffer *s_buf, int value){
   int i;
   int data;
   //int value;
-  int nextIn = 0;
   //st_utime_t sleepTime =  SLEEP_TIME_P;
 
   fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 prod INIT - emptyBuffers",s_buf->sems->emptyBuffers->value); 
@@ -64,10 +63,10 @@ void deposit(synced_buffer *s_buf, int value){
 
   //value = rand();
   //value = value % 100;
-  (s_buf->buffer[nextIn]) = value;
-  data = (s_buf->buffer[nextIn]);
-  nextIn = (nextIn + 1) % BUFFER_SIZE;
-  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",nextIn);
+  (s_buf->buffer[s_buf->nextIn]) = value;
+  data = (s_buf->buffer[s_buf->nextIn]);
+  (s_buf->nextIn) = (s_buf->nextIn + 1) % BUFFER_SIZE;
+  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d , %s: %d, %s: %d\n","I have produced",data,"my val",value,"i", i,"nextIn",s_buf->nextIn);
 
   fprintf(s_buf->sems->out_stream, "%s: %d\n","3 p fullBuffers",s_buf->sems->fullBuffers->value);
   up(s_buf->sems->fullBuffers);
@@ -82,7 +81,6 @@ void deposit(synced_buffer *s_buf, int value){
 int remoove(synced_buffer *s_buf){
   int i;
   int data;
-  int nextOut = 0;
   //st_utime_t sleepTime =  SLEEP_TIME_C;
 
   fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 cons INIT - fullBuffers",s_buf->sems->fullBuffers->value);
@@ -91,9 +89,9 @@ int remoove(synced_buffer *s_buf){
   fprintf(s_buf->sems->out_stream, "%s: %d\n","2 c fullBuffers",s_buf->sems->fullBuffers->value);
   //assert(s_buf->sems->fullBuffers->value > 0);
 
-  data = (s_buf->buffer[nextOut]);
-  nextOut = (nextOut + 1) % BUFFER_SIZE;
-  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",nextOut);
+  data = (s_buf->buffer[s_buf->nextOut]);
+  (s_buf->nextOut) = (s_buf->nextOut + 1) % BUFFER_SIZE;
+  fprintf(s_buf->sems->out_stream, "%s: %d, %s: %d, %s: %d\n","I have consumed", data,"i", i,"nextOut",s_buf->nextOut);
 
   fprintf(s_buf->sems->out_stream, "%s: %d\n","3 c emptyBuffers",s_buf->sems->emptyBuffers->value);
   up(s_buf->sems->emptyBuffers);
@@ -143,6 +141,8 @@ synced_buffer *buffer_init(){
 
   sync_buf->buffer = buffer;
   sync_buf->sems = sems;
+  sync_buf->nextIn = 0;
+  sync_buf->nextOut = 0;
   
   //*shared_buffers = local_buffers;
   return sync_buf;
