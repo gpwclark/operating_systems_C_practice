@@ -1,3 +1,7 @@
+/* I have neither given nor recieved help on this assignment.
+ * George Clark
+ */ 
+
 // TODO BE AWARE OF INCLUDING THINGS TOO MANY TIMES
 // TODO COMMENT YOUR CODE BUDDY!!!!!!!!!!
 /* This class uses a struct, sem_conditionals, this struct is passed to it's two 
