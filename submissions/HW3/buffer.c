@@ -49,12 +49,14 @@
  */
 #define BUFFER_SIZE 200
 
+int nextIn = 0;
+int nextOut = 0;
+
 void deposit(synced_buffer *s_buf, int value){
   int i;
   int data;
   //int value;
-  int nextIn = 0;
-  //st_utime_t sleepTime =  SLEEP_TIME_P;
+  st_utime_t sleepTime =  SLEEP_TIME_P;
 
   fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 prod INIT - emptyBuffers",s_buf->sems->emptyBuffers->value); 
   down(s_buf->sems->emptyBuffers);
@@ -76,14 +78,13 @@ void deposit(synced_buffer *s_buf, int value){
   // assert?
   fflush(s_buf->sems->out_stream);
 
-  // st_usleep(sleepTime);
+  st_usleep(sleepTime);
 }
 
 int remoove(synced_buffer *s_buf){
   int i;
   int data;
-  int nextOut = 0;
-  //st_utime_t sleepTime =  SLEEP_TIME_C;
+  st_utime_t sleepTime =  SLEEP_TIME_C;
 
   fprintf(s_buf->sems->out_stream, "\n%s: %d\n","1 cons INIT - fullBuffers",s_buf->sems->fullBuffers->value);
   down(s_buf->sems->fullBuffers);
@@ -102,7 +103,7 @@ int remoove(synced_buffer *s_buf){
   // assert?
 
   fflush(s_buf->sems->out_stream);
-  //st_usleep(sleepTime);
+  st_usleep(sleepTime);
 
   return data;
 }
