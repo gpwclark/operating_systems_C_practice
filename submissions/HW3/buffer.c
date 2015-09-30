@@ -49,6 +49,9 @@
  */
 #define BUFFER_SIZE 200
 
+int nextIn = 0;
+int nextOut = 0;
+
 void deposit(synced_buffer *s_buf, int value){
   int i;
   int data;
@@ -75,7 +78,7 @@ void deposit(synced_buffer *s_buf, int value){
   // assert?
   fflush(s_buf->sems->out_stream);
 
-  // st_usleep(sleepTime);
+  st_usleep(sleepTime);
 }
 
 int remoove(synced_buffer *s_buf){
@@ -100,7 +103,7 @@ int remoove(synced_buffer *s_buf){
   // assert?
 
   fflush(s_buf->sems->out_stream);
-  //st_usleep(sleepTime);
+  st_usleep(sleepTime);
 
   return data;
 }
