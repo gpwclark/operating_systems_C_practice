@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 typedef struct {
-    FILE *out_stream;
     semaphore *emptyBuffers;
     semaphore *fullBuffers;
 }sem_conditionals;

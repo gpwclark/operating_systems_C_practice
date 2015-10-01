@@ -6,7 +6,6 @@ typedef struct {
   sem_conditionals *sems;
   int nextIn;
   int nextOut;
-  int id;
 } synced_buffer;
 
 void deposit(synced_buffer *s_buf, int value);
