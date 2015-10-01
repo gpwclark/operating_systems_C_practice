@@ -1,0 +1,16 @@
+hw3
+ - make each thread do one thing!
+ - tests will be much like hw1
+ - how to terminate all the threads.
+ - assert after every down and before it's up that the condition is true.
+ - anything to assert after an up, loop invariant?
+	+ include assert.h
+	+ assert a boolean predicate
+ - Software engineering issues - each thread is a producer and a consumer, improve this with OO style to make it modular.
+ - make a buffer abstract data type, like an object. encapsulate all producer and consumer code, deposit/remoove methods.
+ - main program is called homework 3, must have file buffer.c and buffer.h
+ - 
+
+Extra-credit
+	- build your own semaphores. read the cods and figure out what condition variables.
+
