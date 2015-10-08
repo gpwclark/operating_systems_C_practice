@@ -22,6 +22,7 @@
 
 // TODO check arbitrarily long input use yes cmd
 // TODO make another pass at using asterisk_found variable
+// TODO use getline()?
 // TODO free memory
 
 #include <string.h>
