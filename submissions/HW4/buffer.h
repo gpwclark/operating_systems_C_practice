@@ -2,10 +2,8 @@
 #include "sem_conditionals.h"
 
 typedef struct {
-  int *buffer;
-  sem_conditionals *sems;
-  int nextIn;
-  int nextOut;
+  int *read_pipe;
+  int *write_pipe;
 } synced_buffer;
 
 void deposit(synced_buffer *s_buf, int value);
