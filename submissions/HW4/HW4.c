@@ -20,12 +20,6 @@
  * is 80 characters long.
  */
 
-// TODO make another pass at using asterisk_found variable
-// TODO free memory
-// TODO address in doc TODOs
-// TODO make sure print statements are out except the ones that shouldn't be
-// TODO turn the last 200 lines of procedural code into a loop?
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,12 +30,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-
-//includes for the ST library in CORRECT ORDER, DO NOT REARRANGE
-#include "st.h"
-//#include "semaphore.h"
-#include "sem_conditionals.h"
-#include "buffer.h"
 
 /* Since this is a pipeline (takes ints, returns ints) I had to make the 
  * is_valid_input function into something that would return an int, rather
@@ -56,7 +44,6 @@
  * than the consumuer, we could have a situation where the producer is waiting
  * to write
  */
-#define BUFFER_SIZE 200
 #define FCN_ARRAY_LEN 5
 #define GET_INPUT_IX 0
 #define VALID_IN_IX 1
@@ -68,6 +55,10 @@
  * it needs. Producers and consumers only need one buffer, while hybrid
  * buffers need two, so they can consume from one and produce to another.
  */
+typedef struct{
+  int read_pipe;
+  int write_pipe;
+} synced_buffer;
 
 typedef struct{
   synced_buffer *s_buf_cons;
@@ -84,6 +75,45 @@ typedef struct{
   synced_buffer *s_buf;
   int (*function_ptr)(int);
 } consumer_buffer;
+
+/*
+ * Although I am now using pipes for syncing, the struct synced_buffer still
+ * accurately describes the mechanisms at work. This function initializes
+ * the synced buffer, which just initializes a new buffer that uses pipes
+ * to pass data through the pipeline.
+ */
+synced_buffer *pipe_init(){
+  synced_buffer *sync_buf = (synced_buffer*) malloc(sizeof(synced_buffer));
+  if(sync_buf == NULL){
+    //return null if malloc fails
+    return NULL;
+  }
+  
+  int myPipe[2];
+  
+  if (pipe(myPipe) == -1){
+    fprintf(stderr, "Failed to create a pipe. terminating.");
+    return NULL;
+  }
+
+  sync_buf->read_pipe = myPipe[0];
+  sync_buf->write_pipe = myPipe[1];
+  
+  return sync_buf;
+}
+
+// Deposit and remoove are just simple wrappers for the pipes. I like the
+// semantics of deposit and remoove more than the notion of writing and reading
+// to a file descriptor.
+void deposit(synced_buffer *s_buf, int value){
+  write(s_buf->write_pipe, &value, sizeof(int));
+}
+
+int remoove(synced_buffer *s_buf){
+  int character;
+  read(s_buf->read_pipe, &character, sizeof(int));
+  return character;
+}
 
 // global variables. really just used by print_to_stdout
 int curr_char_count = 0;
@@ -155,7 +185,7 @@ int get_user_input(int character){
  */
 
   int hybrid(void *init_hybrid_buf){
-    //fprintf(stderr,"hybrid: %d running.\n",getpid());
+    //fprintf(stdout,"hybrid: %d running.\n",getpid());
     hybrid_buffer *hybrid_buf = init_hybrid_buf;
     int input_char;
     int input_char1;
@@ -202,7 +232,7 @@ int get_user_input(int character){
 
     } while (input_char != EOF);
     
-    //fprintf(stderr,"input char: %d.\n",input_char);
+    //fprintf(stdout,"input char: %d.\n",input_char);
     //return 0;
     exit(0);
   }
@@ -212,7 +242,7 @@ int get_user_input(int character){
  */
 
     int consumer(void *init_cons_buf){
-    //fprintf(stderr,"consumer: %d running.\n",getpid());
+    //fprintf(stdout,"consumer: %d running.\n",getpid());
       consumer_buffer *cons_buf = init_cons_buf;
 
       int input_char;
@@ -224,7 +254,7 @@ int get_user_input(int character){
           break;
         }
       } while (input_char != EOF);
-      //fprintf(stderr,"input char: %d.\n",input_char);
+      //fprintf(stdout,"input char: %d.\n",input_char);
       //return 0;
       exit(0);
     }
@@ -233,7 +263,7 @@ int get_user_input(int character){
  * and then put it in a buffer.
  */
   int producer(void *init_prod_buf){
-    //fprintf(stderr,"producer: %d running.\n",getpid());
+    //fprintf(stdout,"producer: %d running.\n",getpid());
     producer_buffer *prod_buf = init_prod_buf;
 
     int input_char;
@@ -249,7 +279,7 @@ int main () {
 
   print_buffer = (int *) malloc(sizeof(int)*LINE_PRINT_LENGTH);
   if (print_buffer == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
 
@@ -264,17 +294,17 @@ int main () {
    * The logic here got a bit munged up and it could probably be put in a loop
    * but this explicit style lent itself better to testing different pieces.
    * 
-   * A synced buffer is the buffer that all of the threads need. Plain and simple.
-   * Each function is in one thread, and there are four buffers being shared b/w
-   * them all.
+   * A synced buffer is the buffer that all of the processes. Plain and simple.
+   * Each function is in one process, and there are four buffers being shared b/w
+   * them all that itlize pipes for messaging passing.
    */
-  synced_buffer *s_buf_1 = buffer_init();
-  synced_buffer *s_buf_2 = buffer_init();
-  synced_buffer *s_buf_3 = buffer_init();
-  synced_buffer *s_buf_4 = buffer_init();
+  synced_buffer *s_buf_1 = pipe_init();
+  synced_buffer *s_buf_2 = pipe_init();
+  synced_buffer *s_buf_3 = pipe_init();
+  synced_buffer *s_buf_4 = pipe_init();
 
   if (s_buf_1 == NULL || s_buf_2 == NULL ||  s_buf_3 == NULL || s_buf_4 == NULL){
-    //fprintf(stderr,"Failed to allocate memory for buffer ADT");
+    fprintf(stderr,"Failed to allocate memory for buffer ADT");
     return -1;
   }
 
@@ -285,12 +315,12 @@ int main () {
    */
   producer_buffer *prod_buf = (producer_buffer*)malloc(sizeof(producer_buffer));
   if (prod_buf == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
   hybrid_buffer *hybrid_buf_a = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
   if (hybrid_buf_a == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
 
@@ -307,7 +337,7 @@ int main () {
    */
   hybrid_buffer *hybrid_buf_b = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
   if (hybrid_buf_b == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
 
@@ -319,7 +349,7 @@ int main () {
   //Relation 3 - same pattern as Relation 2.
   hybrid_buffer *hybrid_buf_c = (hybrid_buffer*)malloc(sizeof(hybrid_buffer));
   if (hybrid_buf_c == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
   hybrid_buf_b->s_buf_prod = s_buf_3;
@@ -330,7 +360,7 @@ int main () {
   // Relation 4 - same pattern as relation 2 except consumer is not a hybrid.
   consumer_buffer *cons_buf = (consumer_buffer*)malloc(sizeof(consumer_buffer));
   if (cons_buf == NULL){
-    //fprintf(stderr,"malloc failed");
+    fprintf(stderr,"malloc failed");
     return -1;
   }
 
@@ -352,7 +382,7 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
+    //fprintf(stdout,"I am the child. My childPID is %ld\n", (long)child_PID);
     // this is the child process
     // app logic
     producer(prod_buf);
@@ -365,7 +395,7 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
+    //fprintf(stdout,"I am the child. My childPID is %ld\n", (long)child_PID);
     // this is the child process
     // app logic
     hybrid(hybrid_buf_a);
@@ -378,7 +408,7 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
+    //fprintf(stdout,"I am the child. My childPID is %ld\n", (long)child_PID);
     // this is the child process
     // app logic
     hybrid(hybrid_buf_b);
@@ -391,7 +421,7 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
+    //fprintf(stdout,"I am the child. My childPID is %ld\n", (long)child_PID);
     // this is the child process
     // app logic
     hybrid(hybrid_buf_c);
@@ -404,15 +434,14 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
+    //fprintf(stdout,"I am the child. My childPID is %ld\n", (long)child_PID);
     // this is the child process
     // app logic
     consumer(cons_buf);
   } 
 
-  //fprintf(stderr,"I am the parent. My PID is %d\n", getpid()); 
+  //fprintf(stdout,"I am the parent. My PID is %d\n", getpid()); 
 
-  //TODO is errno used in perror?
   errno = 0;
   while ((wait_PID = wait(&status)) > 0) {
     if (wait_PID == -1){
@@ -420,14 +449,13 @@ int main () {
     } else {
 
       if (WIFSIGNALED(status) != 0){
-        //fprintf(stderr,"Child process: %d terminated, signal: %d \n",(int)wait_PID,WTERMSIG(status));
+        fprintf(stderr,"Child process: %d terminated, signal: %d \n",(int)wait_PID,WTERMSIG(status));
       } else if (WIFEXITED(status) != 0){
-        //TODO take this one out!!!
         //fprintf(stderr,"Child process %d terminated as expected.\n",(int)wait_PID);
       } else if(WIFSTOPPED(status != 0)){
-        //fprintf(stderr,"Child process: %d stopped.\n", (int)wait_PID);
+        fprintf(stderr,"Child process: %d stopped.\n", (int)wait_PID);
       } else{
-        //fprintf(stderr,"Child process: %d terminated with error.\n", (int)wait_PID);
+        fprintf(stderr,"Child process: %d terminated with error.\n", (int)wait_PID);
       }
 
 
