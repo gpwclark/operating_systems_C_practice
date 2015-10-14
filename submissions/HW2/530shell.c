@@ -76,7 +76,6 @@ int run_shell() {
       if (child_PID < 0){
         // no child process created, fork failed
         perror("No child process, failed to fork");
-
       }else if (child_PID == 0){
         // printf("I am the child. My childPID is %ld\n", (long)child_PID);
         errno = 0;
@@ -113,7 +112,7 @@ int run_shell() {
         if (child_PID == -1){ //Wait for child process.
           perror("wait error");
 
-        } else{ 
+        } else { 
 
           if (WIFSIGNALED(status) != 0){
             printf("%s\n","Child process terminated because of receipt of signal.");

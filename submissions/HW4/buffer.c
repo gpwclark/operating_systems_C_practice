@@ -11,8 +11,6 @@
 #include "st.h"
 #include "buffer.h"
 
-//TODO what happens when I return NULL again?
-//TODO remove semaphore crap
 
 /* MAIN EXPLANATION
  * The buffer.c class is based on specs in the buffer.h file.
@@ -28,7 +26,6 @@
  * than the consumuer, we could have a situation where the producer is waiting
  * to write
  */
-#define BUFFER_SIZE 200
 
 /*
  * The deposit function in the producer - consumer paradigm uses these semaphore
@@ -38,9 +35,8 @@
  * the fullBuffers semaphore indicating that there is now data in the buffer.
  */
 void deposit(synced_buffer *s_buf, int value){
-  st_sleep(1);
-  fprintf(stderr,"about to write %d\n", value);
-  write(*(s_buf->write_pipe), &value, sizeof(int));
+  //fprintf(stderr,"%d :: deposit :: %d\n",getpid(), value);
+  write(s_buf->write_pipe, &value, sizeof(int));
 }
 
 /*
@@ -51,10 +47,9 @@ void deposit(synced_buffer *s_buf, int value){
  * the emptyBuffers semaphore indicating that it remooved data from the buffer.
  */
 int remoove(synced_buffer *s_buf){
-  st_sleep(1);
   int character;
-  read(*(s_buf->read_pipe), &character, sizeof(int));
-  fprintf(stderr,"just read %d\n", character);
+  read(s_buf->read_pipe, &character, sizeof(int));
+  //fprintf(stderr,"%d :: remoove :: %d\n",getpid(), character);
   return character;
 }
 
@@ -66,10 +61,10 @@ synced_buffer *buffer_init(){
     return NULL;
   }
   
-  int *myPipe[2];
+  int myPipe[2];
   
-  if (pipe(*myPipe) == -1){
-    fprintf(stderr, "Failed to create a pipe. terminating.");
+  if (pipe(myPipe) == -1){
+    //fprintf(stderr, "Failed to create a pipe. terminating.");
     return NULL;
   }
 
