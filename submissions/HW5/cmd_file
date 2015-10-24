@@ -1,0 +1,6 @@
+ls
+ls -l
+touch file
+echo "indirection"
+rm file
+rm file
