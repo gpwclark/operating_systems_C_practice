@@ -52,7 +52,8 @@ int run_shell() {
     //TODO HERE we need to send the line to the server, but I think we also
     //need to make sure it isn't EOF. if it is send that to server for shutdown
     //but then break from this loop.
-    //
+    //TODO after sending line to server, we wait for response. If the response is a
+    //fatal error we need to show it AND exit. Otherwise, just show whatever it is.
   } while (chars_read != -1);
   free(line);
   //TODO close socket.

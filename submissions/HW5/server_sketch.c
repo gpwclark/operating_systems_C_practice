@@ -5,10 +5,12 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 
 #define TMP_FILE_PREFIX_LEN 3
+#define ERROR_STR_LEN 140
 #define MAX_PID_LEN 5
 #define MAX_ARGS 100
 #define NUM_ARGS 6
@@ -19,6 +21,8 @@
 // TODO free memory
 // TODO check for length of max pid!!
 // TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff.
+// TODO are we checking for ALL of the errors? from all of the functions we use?
+
 
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
@@ -47,36 +51,37 @@ int run_command(char* cmd_to_run, FILE* tmp_fp){
   int status;
   errno = 0;
   child_PID = fork();
-
+  char error_string[ERROR_STR_LEN];
+  bool error_found = false;
+//TODO make sure final RESPONSE line has everything we need.
   if (child_PID < 0){
     // no child process created, fork failed
-    printf("No child process, failed to fork: %s\n", strerror(errno));
-    //TODO send error to client
+    sprintf(error_string, "No child process, failed to fork: %s", strerror(errno));
+    error_found = true;
   } else if (child_PID == 0){
     // printf("I am the child. My childPID is %ld\n", (long)child_PID);
     errno = 0;
     char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
     if(string_array == NULL){
-      printf("Child's malloc failed for constructing the argument list: %s\n", strerror(errno));
-    //TODO send error to client
+      sprintf(error_string, "Child's malloc failed for constructing the argument list: %s", strerror(errno));
+      error_found = true;
       abort();
     }
 
     int ret_val = parse_args(cmd_to_run, string_array); 
     if(ret_val == -1){
       //ERROR, LINE EXCEEDS MAX LENGTH
-      printf("%s%d\n","Line exceeds max number of arguments: ", MAX_ARGS - 1);
-      //TODO send error to client
+      sprintf(error_string, "%s%d", "Line exceeds max number of arguments: ", MAX_ARGS - 1);
+      error_found = true;
       abort();
     }
 
     errno = 0;
     int exec_return = execvp(*string_array, string_array);
     if (exec_return < 0) {
-      printf("Failed to execute, error with command as inputted: %s\n", strerror(errno));
-      //TODO send error to client
+      sprintf(error_string, "Failed to execute, error with command as inputted: %s\n", strerror(errno));
+      error_found = true;
       abort();
-
     }
 
     free(string_array);
@@ -85,16 +90,18 @@ int run_command(char* cmd_to_run, FILE* tmp_fp){
     //we are the parent
     //printf("I am the parent. My child's PID is %ld\n", (long)child_PID);
 
+    //TODO comment in video about WNOHANG?
     errno = 0; 
-    child_PID = wait(&status);
+    child_PID = waitpid(child_PID, &status, WCONTINUED);
     if (child_PID == -1){ //Wait for child process.
-      printf("Wait error: %s\n", strerror(errno));
-
+      sprintf(error_string, "Wait error: %s\n", strerror(errno));
+      error_found = true;
     } else { 
       //TODO we only need to look at WIFEXITED and WIFEXITSTATUS
       //WIFEXITED always gets sent, if it is non-zero then we also
       //send WIFEXITSTATUS.
 
+      /*
       if (WIFSIGNALED(status) != 0){
         printf("%s\n","Child process terminated because of receipt of signal.");
       } else if (WIFEXITED(status) != 0){
@@ -104,22 +111,48 @@ int run_command(char* cmd_to_run, FILE* tmp_fp){
       } else{
         printf("%s\n", "Child process terminated with error.");
       }
+      */
+      int wif_exited = WIFEXITED(status);
+      if (wif_exited != 0){
+        // printf("%s\n", "Child process terminated as expected.");
+        fprintf(stderr, "wifexit: %d\n", wif_exited);
+      } else {
+        int exit_status = WEXITSTATUS(status); 
+        fprintf(stderr, "wifexit: %d :: wifstatus: %d\n", wif_exited, exit_status);
+      }
+
       //TODO Need to use fopen() and read() on tmp_file_name to read what came 
       //in on stdout, as of now, unsure how this works IF there was some sort
       //of error, also, need to overwrite the file so we don't report old stuff?
       //We also have to send that response line...
+      if(error_found){
+        //TODO
+        //response needs wifexited and wexitstatus,
+        //response is just RESPONSE: error_string wifexited and wexitstatus.
+        //This will be a generic response shared by fatal error
+
+      } else {
+        // Need to fopen and read tmp file. 
+        // but also when we are done reading it we need to clear it so
+        // we don't send duplicate data next time.
+        // then we send response 
+        // response needs wifexited and wexitstatus
+        // RESPONSE: End of Comand's stdout: exit_code: %d, exit_status: %d
+
+        //TODO what if error occurs here... send an error response I guess
+      }
 
     }
     //printf("%s\n","Parent process ended.");
 
   } //end parent
+
   //TODO we could return -1 on error but it might not make sense since 
-  //regardless of error we just send stdout to server.
-  //TODO we could return -1 on error but it might not make sense since 
-  //regardless of error we just send stdout to server.
+  //regardless of error we have already notified the client.
   return 0;
 }
 
+//TODO what about a call to getpid? error code for that right?
 char* get_tmp_file_name(){
   char* tmp_file_name = (char*) malloc ((TMP_FILE_PREFIX_LEN + MAX_PID_LEN) * sizeof(char));
   int ret_val = sprintf(tmp_file_name, "tmp%d", getpid());
@@ -164,7 +197,9 @@ char** accept_connection(){
 }
 
 int main(int argc, char **argv) {
-  char error[200];
+  char error_string[140];
+  bool error_found = false;
+  FILE *fp;
   //  char[] ps_string = "";
   //  char[] cmd_string = "";
 
@@ -175,7 +210,7 @@ int main(int argc, char **argv) {
 
   //TODO free this
   char **cmd_array = accept_connection();
-  //TODO send error straight to client rather than printing.
+  //TODO delete this BS code
   printf("returned string array:\n");
   int i = 0;
   while (i < NUM_ARGS){
@@ -190,19 +225,19 @@ int main(int argc, char **argv) {
   char *tmp_file_name = get_tmp_file_name(); //tmpxxxx
   if (tmp_file_name == NULL){
     //TODO send error straight to client rather than printing.
-    sprintf(error, "Failed to construct tmp_file_name_string\n");
-    printf(error);
+    sprintf(error_string, "Failed to construct tmp_file_name_string\n");
+    error_found = true;
   } else {
     //TODO we don't actually want to print this...
     printf("%s\n", tmp_file_name);
 
     // second command
     errno = 0;
-    FILE *fp = freopen(tmp_file_name, "w+", stdout);
+    fp = freopen(tmp_file_name, "w+", stdout);
     if(fp == NULL){
       //TODO send error straight to client rather than printing.
-      sprintf(error,"Failed to redirect stdout to tmp file: %s\n", strerror(errno));
-      printf(error);
+      sprintf(error_string,"Failed to redirect stdout to tmp file: %s\n", strerror(errno));
+      error_found = true;
     } else {
 
       // third command, will this be necessary when we implement socket?
@@ -233,11 +268,18 @@ int main(int argc, char **argv) {
       }
     } // end while
   }
-  free(cmd_array);
-  free(tmp_file_name);
 } 
 
-// TODO do not forget to remove the temp file
-// if (fd != fail)
-// remove(fd);
+  if(error_found){
+    //TODO
+    //response is just RESPONSE: FATAL ERROR error_string.
+    //This will be a generic response shared by normal error
+
+  }
+  if (fp != NULL){
+    remove(tmp_file_name);
+  }
+
+  free(cmd_array);
+  free(tmp_file_name);
 }
