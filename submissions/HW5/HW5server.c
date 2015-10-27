@@ -19,13 +19,16 @@
 #define MAX_PID_LEN 5
 #define MAX_ARGS 100
 
+// TODO ALL THIS APPLIES TO THE CLIENT TOO
 // TODO obviously, the error printing needs to turn into a send
 // TODO remove NUM_ARGS
 // TODO implement the socket
 // TODO free memory
 // TODO check for length of max pid!!
+// TODO remove print statements
 // TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff.
 // TODO are we checking for ALL of the errors? from all of the functions we use?
+// TODO make sure tmp file is removes on unnatural exit
 
 
 //TODO if server strings are null terminated client should behave as expected.
@@ -51,7 +54,7 @@ int parse_args(char *raw_arg_string, char **string_array){
   }
 }
 
-int run_command(char* cmd_to_run, char* tmp_file_name){
+int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket){
   pid_t child_PID;
   int status;
   errno = 0;
@@ -69,25 +72,22 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
     errno = 0;
     char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
     if(string_array == NULL){
-      sprintf(error_string, "Child's malloc failed for constructing the argument list: %s", strerror(errno));
-      error_found = true;
-      abort();
+      free(string_array);
+      exit(2);
     }
 
     int ret_val = parse_args(cmd_to_run, string_array); 
     if(ret_val == -1){
       //ERROR, LINE EXCEEDS MAX LENGTH
-      sprintf(error_string, "%s%d", "Line exceeds max number of arguments: ", MAX_ARGS - 1);
-      error_found = true;
-      abort();
+      free(string_array);
+      exit(3);
     }
 
     errno = 0;
     int exec_return = execvp(*string_array, string_array);
     if (exec_return < 0) {
-      sprintf(error_string, "Failed to execute, error with command as inputted: %s\n", strerror(errno));
-      error_found = true;
-      abort();
+      free(string_array);
+      exit(4);
     }
 
     free(string_array);
@@ -115,6 +115,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
          }
          */
       int wif_exited = WIFEXITED(status);
+      printf("%d exit_status\n", wif_exited);
       int exit_status;
       if (wif_exited != 0){
         exit_status = WEXITSTATUS(status); 
@@ -143,11 +144,13 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
           // IO error, ret val is -1 and errno is != 0
 
           errno = 0;
+          int i;
+          int sock_char;
           do {
             num_bytes_read = read(fd, buf, READ_BUF_SIZE);
 
             if (num_bytes_read == -1){
-              if (errno != 0){
+              if (errno != -1){
                 sprintf(error_string, "Error while attempting to read file with stdout from exec comand: %s", strerror(errno));
                 error_found = true;
                 //TODO send error, file IO
@@ -157,14 +160,26 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
                 break;
               }
             }
-
-            for(int i = 0; i < num_bytes_read; i++) {
+            int i;
+            int sock_char;
+            int sock_return;
+            for(i = 0; i < num_bytes_read; i++) {
               fprintf(stderr, "%c", buf[i]);
               //TODO this gets sent to the client
               //we sort of want to put it in a buffer though, just in case 
               //clearing the file fails, or do we?
               //TODO we are supposed to use read but we are also supposed to send commands
               //line by line?
+                sock_char = buf[i];
+                sock_return = Socket_putc(sock_char, connection_socket); 
+                if (sock_char == '\n'){
+                  sock_return = Socket_putc('\0', connection_socket); 
+                }
+                if (sock_return == EOF){
+                  printf("Sockets_putc returned EOF or error\n");
+                  Socket_close(connection_socket);
+                  exit (-1);
+                }
             }
           } while (num_bytes_read != 0);
 
@@ -185,14 +200,25 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
       } else {
         // RESPONSE: End of Comand's stdout: exit_code: %d, exit_status: %d
         if (wif_exited != 0){
-          sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "End of stdout", wif_exited, exit_status);
+          if (exit_status == 2){
+            //exit code 2
+            sprintf(response_string,"%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE,"Error, Child's malloc failed for constructing the argument list", wif_exited, 1);
+          } else if (exit_status ==3){
+            //exit code 3
+            sprintf(response_string, "%s: %s%d, Exit Code: %d, Exit Status: %d\n", RESPONSE,"Error, Line exceeds max number of arguments: ", MAX_ARGS - 1, wif_exited, 1);
+          } else if (exit_status == 4){
+            //Exit code 4
+            sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "Error, Failed to execute, error with command as inputted", wif_exited, 1);
+          } else {
+            sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "End of stdout", wif_exited, exit_status);
+          }
         } else {
           sprintf(response_string, "%s: %s, Exit Code: %d\n", RESPONSE, "End of stdout", wif_exited);
         }
         //TODO send normal response to client
         fprintf(stderr, "%s", response_string);
       }
-
+      send_line(connection_socket, response_string);
     }
     //printf("%s\n","Parent process ended.");
   } //end parent
@@ -210,6 +236,26 @@ char* get_tmp_file_name(){
   } else {
     return tmp_file_name;
   }
+}
+
+int send_line(Socket connection_socket, char* line){
+  //TODO check if line==null
+  int length = strlen(line);
+  length = length + 1; /*need to include null terminator*/
+
+  int i;
+  int sock_char;
+  int sock_return;
+  for (i = 0; i < length; i++){
+    sock_char = line[i];
+    sock_return = Socket_putc(sock_char, connection_socket); 
+    if (sock_return == EOF){
+      printf("Sockets_putc returned EOF or error\n");
+      Socket_close(connection_socket);
+      exit (-1);
+    }
+  }
+
 }
 
 int main(int argc, char **argv) {
@@ -242,7 +288,6 @@ int main(int argc, char **argv) {
   //TODO free this
   char *tmp_file_name = get_tmp_file_name(); //tmpxxxx
   if (tmp_file_name == NULL){
-    //TODO send error straight to client rather than printing.
     sprintf(error_string, "Failed to construct tmp_file_name_string\n");
     error_found = true;
   } 
@@ -250,7 +295,6 @@ int main(int argc, char **argv) {
   errno = 0;
   fp = freopen(tmp_file_name, "w+", stdout);
   if(fp == NULL){
-    //TODO send error straight to client rather than printing.
     sprintf(error_string,"Failed to redirect stdout to tmp file: %s\n", strerror(errno));
     error_found = true;
   } 
@@ -266,6 +310,7 @@ int main(int argc, char **argv) {
     sprintf(response_string, "%s: %s, %s\n", RESPONSE, FATAL_ERROR, error_string);
     fprintf(stderr, "%s", response_string);
     //TODO send to client BUT MAKE SURE CLIENT TERMINATES.
+    send_line(connection_socket, response_string);
     return -1;
 
   }
@@ -273,7 +318,7 @@ int main(int argc, char **argv) {
   //TODO main while loop terminates when sock_char == EOF
   //inner while loop waits for null character and then sends that
   //string to run command
-  
+
   i = 0;
   do {  
     sock_char = Socket_getc(connection_socket);
@@ -285,7 +330,7 @@ int main(int argc, char **argv) {
       i++;
       if (sock_char == '\0'){
         i = 0;
-        run_command(sock_array, tmp_file_name);
+        run_command(sock_array, tmp_file_name, connection_socket);
       }
     }
   } while (sock_char != EOF);

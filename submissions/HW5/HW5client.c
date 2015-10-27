@@ -135,12 +135,10 @@ int main(int argc, char **argv) {
   //TODO get host and port from argc and argv
   //TODO init the socket.
 
-  printf("that's true");
   if (argc < 3){
     printf("Error, program needs DNS hostname and port number as arguments\n");
     return -1;
   }
-  printf("that's true too");
 
   Socket connection_socket;
   connection_socket = Socket_new(argv[1], atoi(argv[2]));
