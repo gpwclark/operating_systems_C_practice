@@ -1,2 +1,3 @@
 #!/bin/bash
-gcc server_sketch.c
+gcc HW5server.c libsocket.c -o server
+gcc HW5client.c libsocket.c -o client

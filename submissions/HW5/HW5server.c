@@ -9,13 +9,15 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+#include "Socket.h"
+#include "Shell.h"
+
 #define TMP_FILE_PREFIX_LEN 3
 #define RESPONSE_STR_LEN 280
 #define ERROR_STR_LEN 140
 #define READ_BUF_SIZE 10
 #define MAX_PID_LEN 5
 #define MAX_ARGS 100
-#define NUM_ARGS 6
 
 // TODO obviously, the error printing needs to turn into a send
 // TODO remove NUM_ARGS
@@ -26,6 +28,7 @@
 // TODO are we checking for ALL of the errors? from all of the functions we use?
 
 
+//TODO if server strings are null terminated client should behave as expected.
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
   char white_space_delim[] = " \t\n\v\f\r";
@@ -56,6 +59,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
   char error_string[ERROR_STR_LEN];
   bool error_found = false;
   //TODO make sure final RESPONSE line has everything we need.
+
   if (child_PID < 0){
     // no child process created, fork failed
     sprintf(error_string, "No child process, failed to fork: %s", strerror(errno));
@@ -103,23 +107,21 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
          if (WIFSIGNALED(status) != 0){
          printf("%s\n","Child process terminated because of receipt of signal.");
          } else if (WIFEXITED(status) != 0){
-        // printf("%s\n", "Child process terminated as expected.");
-        } else if(WIFSTOPPED(status != 0)){
-        printf("%s\n", "Child process stopped.");
-        } else{
-        printf("%s\n", "Child process terminated with error.");
-        }
-      */
+         printf("%s\n", "Child process terminated as expected.");
+         } else if(WIFSTOPPED(status != 0)){
+         printf("%s\n", "Child process stopped.");
+         } else{
+         printf("%s\n", "Child process terminated with error.");
+         }
+         */
       int wif_exited = WIFEXITED(status);
       int exit_status;
       if (wif_exited != 0){
         exit_status = WEXITSTATUS(status); 
       }
 
-      //TODO Need to use fopen() and read() on tmp_file_name to read what came 
-      //in on stdout, as of now, unsure how this works IF there was some sort
-      //of error, also, need to overwrite the file so we don't report old stuff?
-      //We also have to send that response line...
+      //TODO We also have to send that response line for success
+      //normal error, or fatal error.
       if(!error_found) {
         // Need to fopen and read tmp file. 
         // but also when we are done reading it we need to clear it so
@@ -149,6 +151,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
                 sprintf(error_string, "Error while attempting to read file with stdout from exec comand: %s", strerror(errno));
                 error_found = true;
                 //TODO send error, file IO
+                break;
               } else {
                 //EOF reached
                 break;
@@ -159,9 +162,10 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
               fprintf(stderr, "%c", buf[i]);
               //TODO this gets sent to the client
               //we sort of want to put it in a buffer though, just in case 
-              //clearing the file fails.
+              //clearing the file fails, or do we?
+              //TODO we are supposed to use read but we are also supposed to send commands
+              //line by line?
             }
-
           } while (num_bytes_read != 0);
 
           FILE *fp = fopen(tmp_file_name, "w");
@@ -171,36 +175,28 @@ int run_command(char* cmd_to_run, char* tmp_file_name){
           }
         }
       }
-      
+
       char response_string[RESPONSE_STR_LEN];
 
       if(error_found){
-        //TODO
-        //response needs wifexited and wexitstatus,
-        //response is just RESPONSE: error_string wifexited and wexitstatus.
-        //This will be a generic response shared by fatal error
-        sprintf(response_string, "%s: %s\n", "RESPONSE", error_string);
+        //TODO needs to be send to client
+        sprintf(response_string, "%s: %s\n", RESPONSE, error_string);
         fprintf(stderr, "%s", response_string);
       } else {
-        // then we send response 
-        // response needs wifexited and wexitstatus
         // RESPONSE: End of Comand's stdout: exit_code: %d, exit_status: %d
-        //TODO send normal response
         if (wif_exited != 0){
-          sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", "RESPONSE", "End of stdout", wif_exited, exit_status);
+          sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "End of stdout", wif_exited, exit_status);
         } else {
-          sprintf(response_string, "%s: %s, Exit Code: %d\n", "RESPONSE", "End of stdout", wif_exited);
+          sprintf(response_string, "%s: %s, Exit Code: %d\n", RESPONSE, "End of stdout", wif_exited);
         }
+        //TODO send normal response to client
         fprintf(stderr, "%s", response_string);
       }
 
     }
     //printf("%s\n","Parent process ended.");
-
   } //end parent
 
-  //TODO we could return -1 on error but it might not make sense since 
-  //regardless of error we have already notified the client.
   return 0;
 }
 
@@ -216,61 +212,31 @@ char* get_tmp_file_name(){
   }
 }
 
-char** accept_connection(){
-  FILE *fp;
-  char *line = NULL;
-  size_t len = 0;
-  ssize_t read;
-
-  char** string_array = (char**) malloc (NUM_ARGS * sizeof(char*));
-
-
-  fp = fopen("cmd_file", "r");
-  if (fp == NULL){
-    return NULL;
-  }
-
-  int i = 0;
-  while ((read = getline(&line, &len, fp)) != -1) {
-    read = read + 1; //null terminator at end needs to be included
-
-    char* string = (char*) malloc (read * sizeof(char));
-    memcpy(string, line, read);
-    string_array[i] = string;
-    ++i;
-  }
-
-  fclose(fp);
-  if (line){
-    free(line);
-  }
-
-  return string_array;
-}
-
 int main(int argc, char **argv) {
   char error_string[140];
   bool error_found = false;
   FILE *fp;
-  //  char[] ps_string = "";
-  //  char[] cmd_string = "";
+  int sock_char;
+  int i;
 
-  // program needs to accept a connection which it will use to get data line by
-  // line, for this test server, we will pass it a filename where each line
-  // in the file will be a command to be executed.
-  // conn = socket();
+  ServerSocket welcome_socket;
+  Socket connection_socket;
 
-  //TODO free this
-  char **cmd_array = accept_connection();
-  //TODO delete this BS code
-  printf("returned string array:\n");
-  int i = 0;
-  while (i < NUM_ARGS){
-    printf("%s", cmd_array[i]);
-    ++i;
+  if (argc < 2) {
+    printf("Error must specify port\n");
+    return -1;
+  }
+  welcome_socket = ServerSocket_new(atoi(argv[1]));
+  if (welcome_socket < 0){
+    printf("Error failed to create welcome socket\n");
+    return -1;
   }
 
-  //Pattern: command, if(failure)(do_this) else (do_that)
+  connection_socket = ServerSocket_accept(welcome_socket);
+  if (connection_socket < 0){
+    printf("Error, Server Socket accept failed");
+    return -1;
+  }
 
   // first command
   //TODO free this
@@ -279,59 +245,59 @@ int main(int argc, char **argv) {
     //TODO send error straight to client rather than printing.
     sprintf(error_string, "Failed to construct tmp_file_name_string\n");
     error_found = true;
-  } else {
-    //TODO we don't actually want to print this...
-    printf("%s\n", tmp_file_name);
-
-    // second command
-    errno = 0;
-    fp = freopen(tmp_file_name, "w+", stdout);
-    if(fp == NULL){
-      //TODO send error straight to client rather than printing.
-      sprintf(error_string,"Failed to redirect stdout to tmp file: %s\n", strerror(errno));
-      error_found = true;
-    } else {
-
-      // third command, will this be necessary when we implement socket?
-      // something like string = conn.getLine();
-      int i = 0;
-      while (i < NUM_ARGS){
-        // fourth command
-        //TODO get actual error? depends on my hw2 program
-        int ret_val = run_command(cmd_array[i], tmp_file_name);
-        if (ret_val == -1){
-          printf("the command did not work");
-          //error = "command failed\n";
-          //printf(error);
-          //TODO the command failed, we pass the error to client via
-          // what is written to stdout? or
-          //TODO wouldn't the client handle what kind of error this is?
-          //and sending it? Perhaps we should handle all of the sending
-          //to the client in this main function and the client will just pass
-          //the message directly or via some file?
-        } else {
-
-          /*
-          //this is where we end up when everything went well
-          //TODO this means here we need to read the tmp file
-          //and send something to the client
-          */
-          ++i;
-        }
-      } // end while
-    }
+  } 
+  // second command
+  errno = 0;
+  fp = freopen(tmp_file_name, "w+", stdout);
+  if(fp == NULL){
+    //TODO send error straight to client rather than printing.
+    sprintf(error_string,"Failed to redirect stdout to tmp file: %s\n", strerror(errno));
+    error_found = true;
   } 
 
+  char* sock_array = (char*) malloc (MAX_LINE_LEN * sizeof(char));
+  if(sock_array == NULL){
+    sprintf(error_string, "Malloc failed for constructing receiving line");
+    error_found = true;
+  }
+
   if(error_found){
-    //TODO
-    //response is just RESPONSE: FATAL ERROR error_string.
-    //This will be a generic response shared by normal error
+    char response_string[RESPONSE_STR_LEN];
+    sprintf(response_string, "%s: %s, %s\n", RESPONSE, FATAL_ERROR, error_string);
+    fprintf(stderr, "%s", response_string);
+    //TODO send to client BUT MAKE SURE CLIENT TERMINATES.
+    return -1;
 
   }
+
+  //TODO main while loop terminates when sock_char == EOF
+  //inner while loop waits for null character and then sends that
+  //string to run command
+  
+  i = 0;
+  do {  
+    sock_char = Socket_getc(connection_socket);
+    if (sock_char == EOF){
+      printf("EOF received by client OR error");
+      return 0;
+    } else {
+      sock_array[i] = sock_char;  
+      i++;
+      if (sock_char == '\0'){
+        i = 0;
+        run_command(sock_array, tmp_file_name);
+      }
+    }
+  } while (sock_char != EOF);
+
+
   if (fp != NULL){
     remove(tmp_file_name);
   }
 
-  free(cmd_array);
   free(tmp_file_name);
+  //TODO should welcome socket be closed earlier?
+  Socket_close(welcome_socket);
+  Socket_close(connection_socket);
+  return 0;
 }
