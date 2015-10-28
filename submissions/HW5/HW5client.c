@@ -122,13 +122,25 @@ int run_shell(Socket connection_socket) {
 
 
       /*
-       * This inner while loop takes input from the server up to a predetermined
-       * max character length. It's main exit condition is when the server passes
-       * the null terminator, this indicates that a full line has been passed
-       * to the client from the server. When this happens, we 
-       *
+       * This while loop depends on an inner while loop to get a line of input
+       * from the server, after this happens we copy the line to a string
+       * we can use as a parameter and then give it to a function called
+       * parse_response. Parse response returns true if there are more
+       * lines of input (for the given command) that need to come back from the
+       * server. When the parse_response function receives a response line, it
+       * prints this line (just like the ones before it) but returns false. This
+       * is the exit condition for this loop. When this occurs we go back to the 
+       * top of the loop outside this one and continue to receive line from stdin.
        */
       do {
+        /*
+         * This inner while loop takes input from the server up to a predetermined
+         * max character length. It's main exit condition is when the server passes
+         * the null terminator, this indicates that a full line has been passed
+         * to the client from the server. When this happens, we break from this
+         * while loop and depend on the logic of the outer while loop to continue
+         * executing as long as there are lines to receive from the server.
+         */
         i = 0;
         while ( i < MAX_LINE_LEN){
           sock_char = Socket_getc(connection_socket);
