@@ -19,8 +19,6 @@
 #define MAX_PID_LEN 5
 #define MAX_ARGS 100
 
-// TODO remove print statements
-
 /*
  * This is an identical function to the one from HW2. It uses strtok to break up
  * the command for execvp in the child process
@@ -89,7 +87,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
     errno = 0;
     int exec_return = execvp(*string_array, string_array);
     if (exec_return < 0) {
-      fprintf(stderr, "EXEC FAILED\n");
       free(string_array);
       exit(4);
     }
@@ -115,7 +112,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
       int wif_exited = WIFEXITED(status);
       int exit_status;
-      fprintf(stderr, "%d exit_code\n", wif_exited);
       if (wif_exited != 0){
         exit_status = WEXITSTATUS(status); 
       }
@@ -166,7 +162,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
             int sock_char;
             int sock_return;
             for(i = 0; i < num_bytes_read; i++) {
-              fprintf(stderr, "%c", buf[i]);
               sock_char = buf[i];
               sock_return = Socket_putc(sock_char, connection_socket); 
               if (sock_char == '\n'){
@@ -204,7 +199,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
       if(error_found){
         //TODO needs to be send to client
         sprintf(response_string, "%s: %s\n", RESPONSE, error_string);
-        fprintf(stderr, "%s", response_string);
       } else {
         /*
          * This logic handles sending the wif_exited value and if necessary
@@ -231,7 +225,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
           sprintf(response_string, "%s: %s, Exit Code: %d\n", RESPONSE, "End of stdout", wif_exited);
         }
         //TODO send normal response to client
-        fprintf(stderr, "%s", response_string);
       }
       
       /*
@@ -372,7 +365,6 @@ int main(int argc, char **argv) {
       printf("Malloc failed for constructing response line");
     } else {
       sprintf(response_string, "%s: %s, %s\n", RESPONSE, FATAL_ERROR, error_string);
-      fprintf(stderr, "%s", response_string);
       send_line(connection_socket, response_string);
       free(response_string);
     }
