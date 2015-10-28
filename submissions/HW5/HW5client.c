@@ -8,20 +8,25 @@
 
 #include "Socket.h"
 #include "Shell.h"
-//TODO remove useless includes in server and client
 
+/*
+ * This program serves as the exit condition for the inner loop in run_shell.
+ * Run_shell's main loop watches to see if EOF occurs, the inner loop makes sure
+ * that we continue to read characters from the socket until the server has sent
+ * a response, indicating that the server is done processing the command and the
+ * client should pass it another command to run (providing there is one and EOF has
+ * not been reached). This command needs to distiguish between two main cases. 
+ * In the case that the line does not contain RESPONSE in all capital letters,
+ * we just print the line and return true because a line containing the string 
+ * "RESPONSE" indicates that stdout is done. If the line does contain "RESPONSE"
+ * then we print the line and return false. In the case that a FATAL_ERROR has 
+ * occurred we print the error and shut down. There are a few highly improbable
+ * errors that could occur and would cause the server to shut down, in this
+ * case we need a mechanism to shut down the client as well, this is what
+ * a RESPONSE that is also a FATAL_ERROR triggers.
+ */
 bool parse_response(char* response_string){
   char* ret_val;
-  //read_in_response.
-  // Need to distinguish between 3 different cases.
-  //   1. FATAL error, server can't do a thing so we ahve to abort
-  //     entirely.
-  //   2. and 3.
-  //     now, because the server is writing all none fatal errors
-  //     to the socket, and an error will just be one line (theoretically)
-  //     and a normal response will be w/e cmd output is followed by
-  //     a response line, it doesn't seem like I even need to freaking
-  //     worry about differentiating between 2 and 3.
   ret_val = strstr(response_string, RESPONSE);
   printf("%s", response_string);
   if (ret_val == NULL) {
@@ -37,55 +42,72 @@ bool parse_response(char* response_string){
   }
 }
 
+/*
+ * This function takes a socket and then prints a prompt. The function getline()
+ * waits for input on stdin. 
+ */
 int run_shell(Socket connection_socket) {
-  //TODO need to decide when to get response and how to print it.
-  static const char SHELL_PROMPT[] = "% ";
   char* char_array = (char*) malloc (MAX_LINE_LEN * sizeof(char));
+  static const char SHELL_PROMPT[] = "% ";
+  size_t chars_to_read = 0;
+  bool response_parse_ret;
+  bool getline_error;
   char sock_ret_line[MAX_LINE_LEN];
   char *line;
-  size_t chars_to_read = 0;
   int chars_read;
-  errno = 0; 
   int sock_char;
   int sock_return;
-  int i = 0;
-  bool response_parse_ret;
   int input_char;
+  int i = 0;
+  errno = 0; 
 
   /*
    * This do while loop terminates when the return value for getline is -1, 
    * indicating that the getline function has encountered the EOF.
    */
   do {
+    getline_error = false;
     printf("%s",SHELL_PROMPT);
 
+    /*
+     * First we receive a line on stdin and then we pass that line, including
+     * the null terminator to the server program.
+     */
     errno = 0;
     chars_read = getline(&line, &chars_to_read, stdin);
-    if (chars_read == -1){
+
+    /* If getline fails we need to print the error. And make sure
+     * we don't do anything with the line this iteration of the loop.
+    */
+    if (errno != 0 ){
+      perror("Failed to read input line");
+      getline_error = true;
+    } else {
+
+      // Send EOF to server because getline returned EOF. 
+      if (chars_read == -1){
         sock_char = EOF;
         sock_return = Socket_putc(sock_char, connection_socket); 
         if (sock_return == EOF){
           printf("Sockets_putc returned EOF or error\n");
           Socket_close(connection_socket);
         }
-      break;
+        break;
+      }
+
     }
-    int getline_failure = 0;
-    if (errno != 0 ){
-      perror("Failed to read input line");
-      getline_failure = -1;
-      break;
-    }
+
+
     chars_read = chars_read + 1; /* getline doesn't include null terminator*/
-    if (chars_read > MAX_LINE_LEN){
+    if ( (chars_read > MAX_LINE_LEN) || (getline_error) ){
+      getline_error = false;
       printf("Error, maximum line length is 1024");
     } else {
 
-      /* TODO comment
+      /* 
+       * This while loop reads through every character of the string inputted
+       * from stdin including the null terminator and sends it to the server.
       */
-      //TODO HERE we need to send the line to the server, but I think we also
-      //need to make sure it isn't EOF. if it is send that to server for shutdown
-      //but then break from this loop.
       i = 0;
       while (i < chars_read){
         sock_char = line[i];
@@ -99,9 +121,13 @@ int run_shell(Socket connection_socket) {
       }
 
 
-      //TODO after sending line to server, we wait for response. If the response is a
-      //fatal error we need to show it AND exit. Otherwise, just show whatever it is.
-      // use parse_response?
+      /*
+       * This inner while loop takes input from the server up to a predetermined
+       * max character length. It's main exit condition is when the server passes
+       * the null terminator, this indicates that a full line has been passed
+       * to the client from the server. When this happens, we 
+       *
+       */
       do {
         i = 0;
         while ( i < MAX_LINE_LEN){
@@ -122,34 +148,32 @@ int run_shell(Socket connection_socket) {
         if ( i == MAX_LINE_LEN){
           sock_ret_line[i-1] = '\0';
         }
-        // print return line
-        // TODO check errors for malloc and memcpy
         memcpy(char_array, &sock_ret_line, MAX_LINE_LEN);
-
         response_parse_ret = parse_response(char_array);
-        /*
-        if(response_parse_ret == true){
-          printf("response parse: true\n");
-        }else{
-          printf("response parse: false\n");
-        }
-        */
-        
+
       } while (response_parse_ret != false); 
     }
   } while (chars_read != -1);
 
-      free(line);
-      free(char_array);
-      return 0;
+  free(line);
+  free(char_array);
+  return 0;
 }
+
+/*
+ * This is the client side implementation of a remote shell, it takes as its
+ * arguments a DNS hostname and a port number corresponding the the port number
+ * that the server is listening on. Note the server must be started before the
+ * client runs otherwise the program will fail. This program uses sockets to 
+ * pass the commands inputted to the client to the server and the server
+ * executes the command and passes what came to stdout back to the client
+ * along with a repsonse line.
+ */
 
 int main(int argc, char **argv) {
   int ret_val = 0;
   const char *RESPONSE;
   const char *FATAL_ERROR;
-  //TODO get host and port from argc and argv
-  //TODO init the socket.
 
   if (argc < 3){
     printf("Error, program needs DNS hostname and port number as arguments\n");
@@ -163,8 +187,11 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  /*
+   * The function run_shell simply accepts commands until it receives EOF for
+   * stdin, from the server (on error), or if other error occurs.
+   */
   ret_val = run_shell(connection_socket);
-  //TODO close the socket?
   Socket_close(connection_socket);
   return ret_val;
 }
