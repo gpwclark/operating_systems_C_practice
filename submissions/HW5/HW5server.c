@@ -20,10 +20,6 @@
 #define MAX_ARGS 100
 
 // TODO ALL THIS APPLIES TO THE CLIENT TOO
-// TODO obviously, the error printing needs to turn into a send
-// TODO remove NUM_ARGS
-// TODO implement the socket
-// TODO free memory
 // TODO check for length of max pid!!
 // TODO remove print statements
 // TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff.
@@ -86,6 +82,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
     errno = 0;
     int exec_return = execvp(*string_array, string_array);
     if (exec_return < 0) {
+      fprintf(stderr, "EXEC FAILED\n");
       free(string_array);
       exit(4);
     }
@@ -98,28 +95,34 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
     //TODO comment in video about WNOHANG?
     errno = 0; 
-    child_PID = waitpid(child_PID, &status, WCONTINUED);
+    child_PID = wait(&status);
+    //child_PID = waitpid(child_PID, &status, WCONTINUED);
+
     if (child_PID == -1){ //Wait for child process.  
       sprintf(error_string, "Wait error: %s\n", strerror(errno)); 
       error_found = true;
     } else { 
+
+      int wif_exited = WIFEXITED(status);
+      int exit_status;
+      if (WIFSIGNALED(status) != 0){
+        fprintf(stderr, "%s\n","Child process terminated because of receipt of signal.");
+      } else if (WIFEXITED(status) != 0){
+        fprintf(stderr, "%s\n", "Child process terminated as expected.");
+        exit_status = WEXITSTATUS(status); 
+      } else if(WIFSTOPPED(status != 0)){
+        fprintf(stderr, "%s\n", "Child process stopped.");
+      } else{
+        fprintf(stderr, "%s\n", "Child process terminated with error.");
+      }
       /*
-         if (WIFSIGNALED(status) != 0){
-         printf("%s\n","Child process terminated because of receipt of signal.");
-         } else if (WIFEXITED(status) != 0){
-         printf("%s\n", "Child process terminated as expected.");
-         } else if(WIFSTOPPED(status != 0)){
-         printf("%s\n", "Child process stopped.");
-         } else{
-         printf("%s\n", "Child process terminated with error.");
+         int wif_exited = WIFEXITED(status);
+         fprintf(stderr, "%d exit_code\n", wif_exited);
+         int exit_status;
+         if (wif_exited != 0){
+         exit_status = WEXITSTATUS(status); 
          }
          */
-      int wif_exited = WIFEXITED(status);
-      printf("%d exit_status\n", wif_exited);
-      int exit_status;
-      if (wif_exited != 0){
-        exit_status = WEXITSTATUS(status); 
-      }
 
       //TODO We also have to send that response line for success
       //normal error, or fatal error.
@@ -170,16 +173,16 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
               //clearing the file fails, or do we?
               //TODO we are supposed to use read but we are also supposed to send commands
               //line by line?
-                sock_char = buf[i];
-                sock_return = Socket_putc(sock_char, connection_socket); 
-                if (sock_char == '\n'){
-                  sock_return = Socket_putc('\0', connection_socket); 
-                }
-                if (sock_return == EOF){
-                  printf("Sockets_putc returned EOF or error\n");
-                  Socket_close(connection_socket);
-                  exit (-1);
-                }
+              sock_char = buf[i];
+              sock_return = Socket_putc(sock_char, connection_socket); 
+              if (sock_char == '\n'){
+                sock_return = Socket_putc('\0', connection_socket); 
+              }
+              if (sock_return == EOF){
+                printf("Sockets_putc returned EOF or error\n");
+                Socket_close(connection_socket);
+                exit (-1);
+              }
             }
           } while (num_bytes_read != 0);
 
@@ -306,42 +309,48 @@ int main(int argc, char **argv) {
   }
 
   if(error_found){
-    char response_string[RESPONSE_STR_LEN];
-    sprintf(response_string, "%s: %s, %s\n", RESPONSE, FATAL_ERROR, error_string);
-    fprintf(stderr, "%s", response_string);
+    char* response_string = (char*) malloc (RESPONSE_STR_LEN * sizeof(char));
+    if(response_string == NULL){
+      printf("Malloc failed for constructing response line");
+    } else {
+      sprintf(response_string, "%s: %s, %s\n", RESPONSE, FATAL_ERROR, error_string);
+      fprintf(stderr, "%s", response_string);
+      send_line(connection_socket, response_string);
+      free(response_string);
+    }
     //TODO send to client BUT MAKE SURE CLIENT TERMINATES.
-    send_line(connection_socket, response_string);
-    return -1;
+  } else {
+
+    //TODO main while loop terminates when sock_char == EOF
+    //inner while loop waits for null character and then sends that
+    //string to run command
+
+    i = 0;
+    do {  
+      sock_char = Socket_getc(connection_socket);
+      if (sock_char == EOF){
+        printf("EOF received by client OR error");
+        //TODO free memory here.
+        break; 
+      } else {
+        sock_array[i] = sock_char;  
+        i++;
+        if (sock_char == '\0'){
+          i = 0;
+          run_command(sock_array, tmp_file_name, connection_socket);
+        }
+      }
+    } while (sock_char != EOF);
 
   }
-
-  //TODO main while loop terminates when sock_char == EOF
-  //inner while loop waits for null character and then sends that
-  //string to run command
-
-  i = 0;
-  do {  
-    sock_char = Socket_getc(connection_socket);
-    if (sock_char == EOF){
-      printf("EOF received by client OR error");
-      return 0;
-    } else {
-      sock_array[i] = sock_char;  
-      i++;
-      if (sock_char == '\0'){
-        i = 0;
-        run_command(sock_array, tmp_file_name, connection_socket);
-      }
-    }
-  } while (sock_char != EOF);
-
 
   if (fp != NULL){
     remove(tmp_file_name);
   }
 
-  free(tmp_file_name);
   //TODO should welcome socket be closed earlier?
+  free(sock_array);
+  free(tmp_file_name);
   Socket_close(welcome_socket);
   Socket_close(connection_socket);
   return 0;

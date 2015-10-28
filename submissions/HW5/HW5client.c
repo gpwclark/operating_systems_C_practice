@@ -35,8 +35,6 @@ bool parse_response(char* response_string){
       exit (-1);
     }
   }
-
-  return 0;
 }
 
 int run_shell(Socket connection_socket) {
@@ -51,7 +49,7 @@ int run_shell(Socket connection_socket) {
   int sock_char;
   int sock_return;
   int i = 0;
-
+  bool response_parse_ret;
   int input_char;
 
   /*
@@ -63,6 +61,15 @@ int run_shell(Socket connection_socket) {
 
     errno = 0;
     chars_read = getline(&line, &chars_to_read, stdin);
+    if (chars_read == -1){
+        sock_char = EOF;
+        sock_return = Socket_putc(sock_char, connection_socket); 
+        if (sock_return == EOF){
+          printf("Sockets_putc returned EOF or error\n");
+          Socket_close(connection_socket);
+        }
+      break;
+    }
     int getline_failure = 0;
     if (errno != 0 ){
       perror("Failed to read input line");
@@ -119,7 +126,16 @@ int run_shell(Socket connection_socket) {
         // TODO check errors for malloc and memcpy
         memcpy(char_array, &sock_ret_line, MAX_LINE_LEN);
 
-      } while (parse_response(char_array) != false); 
+        response_parse_ret = parse_response(char_array);
+        /*
+        if(response_parse_ret == true){
+          printf("response parse: true\n");
+        }else{
+          printf("response parse: false\n");
+        }
+        */
+        
+      } while (response_parse_ret != false); 
     }
   } while (chars_read != -1);
 
