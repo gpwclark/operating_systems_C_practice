@@ -58,14 +58,24 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
   child_PID = fork();
   char error_string[ERROR_STR_LEN];
   bool error_found = false;
-  //TODO make sure final RESPONSE line has everything we need.
 
+  /*
+   * this main if else if, else handles the fork command.
+   * if the fork failed we pass an erroe othewise we exec the command
+   * and wait for it in the parent.
+   */
   if (child_PID < 0){
     // no child process created, fork failed
     sprintf(error_string, "No child process, failed to fork: %s", strerror(errno));
     error_found = true;
   } else if (child_PID == 0){
-    // printf("I am the child. My childPID is %ld\n", (long)child_PID);
+    /*
+     * This is the child process, if we get a specific error
+     * we set a custom error code so we can pass the message to the 
+     * client, if all goes well we simply exec the command
+     * and it's output is captured in a tmp file we send to
+     * the client.
+     */
     errno = 0;
     char** string_array = (char**) malloc (MAX_ARGS * sizeof(char*));
     if(string_array == NULL){
@@ -92,12 +102,15 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
   } else {
     //we are the parent
-    //printf("I am the parent. My child's PID is %ld\n", (long)child_PID);
 
-    //TODO comment in video about WNOHANG?
+    /*
+     * As per standing forking procedure, here we wait for the child process
+     * to finish. If there is an error we note it and skip everything
+     * that would occur if the parent behaved properly, otherwise
+     * we get the WIFEXITED and if necessary WEXITSTATUS variables.
+     */
     errno = 0; 
-    child_PID = wait(&status);
-    //child_PID = waitpid(child_PID, &status, WCONTINUED);
+    child_PID = waitpid(child_PID, &status, WCONTINUED);
 
     if (child_PID == -1){ //Wait for child process.  
       sprintf(error_string, "Wait error: %s\n", strerror(errno)); 
@@ -106,50 +119,39 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
       int wif_exited = WIFEXITED(status);
       int exit_status;
-      if (WIFSIGNALED(status) != 0){
-        fprintf(stderr, "%s\n","Child process terminated because of receipt of signal.");
-      } else if (WIFEXITED(status) != 0){
-        fprintf(stderr, "%s\n", "Child process terminated as expected.");
+      fprintf(stderr, "%d exit_code\n", wif_exited);
+      if (wif_exited != 0){
         exit_status = WEXITSTATUS(status); 
-      } else if(WIFSTOPPED(status != 0)){
-        fprintf(stderr, "%s\n", "Child process stopped.");
-      } else{
-        fprintf(stderr, "%s\n", "Child process terminated with error.");
       }
+
       /*
-         int wif_exited = WIFEXITED(status);
-         fprintf(stderr, "%d exit_code\n", wif_exited);
-         int exit_status;
-         if (wif_exited != 0){
-         exit_status = WEXITSTATUS(status); 
-         }
-         */
-
-      //TODO We also have to send that response line for success
-      //normal error, or fatal error.
+       * If no error is found, we need to write the contents
+       * of the tmp file (which are the output of the command from the
+       * child process) to the client along with a RESPONSE message.
+       */
       if(!error_found) {
-        // Need to fopen and read tmp file. 
-        // but also when we are done reading it we need to clear it so
-        // we don't send duplicate data next time.
-        FILE *fp;
 
+        // Open the tmp file for reading and skip necessary logic if error occurs.
+        FILE *fp;
         errno = 0;
         fp = fopen(tmp_file_name, "r");
         if (fp == NULL){
           sprintf(error_string, "Failed to open file with stdout for reading: %s", strerror(errno));
           error_found = true;
         } else {
+
           int fd = fileno(fp);
           char buf[READ_BUF_SIZE];
           int num_bytes_read;
-          // successful reads
-          // partial reads
-          // EOF, ret val is -1 but errno is 0
-          // IO error, ret val is -1 and errno is != 0
-
-          errno = 0;
           int i;
           int sock_char;
+          errno = 0;
+
+          /*
+           * This function uses the file we opened to read the contents
+           * and pass them to the client over the socket. It exits when
+           * read() reaches the end of the file.
+           */
           do {
             num_bytes_read = read(fd, buf, READ_BUF_SIZE);
 
@@ -169,11 +171,6 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
             int sock_return;
             for(i = 0; i < num_bytes_read; i++) {
               fprintf(stderr, "%c", buf[i]);
-              //TODO this gets sent to the client
-              //we sort of want to put it in a buffer though, just in case 
-              //clearing the file fails, or do we?
-              //TODO we are supposed to use read but we are also supposed to send commands
-              //line by line?
               sock_char = buf[i];
               sock_return = Socket_putc(sock_char, connection_socket); 
               if (sock_char == '\n'){
@@ -187,6 +184,11 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
             }
           } while (num_bytes_read != 0);
 
+          /*
+           * We need to clear the contents of the tmp file so they do not
+           * get written to stdout the next time the run_command function
+           * is called.
+           */
           FILE *fp = fopen(tmp_file_name, "w");
           if (fp == NULL){
             sprintf(error_string, "Failed to clear contents of tmp file: %s", strerror(errno));
