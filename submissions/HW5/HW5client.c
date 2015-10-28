@@ -187,11 +187,13 @@ int main(int argc, char **argv) {
   const char *RESPONSE;
   const char *FATAL_ERROR;
 
+  // Verify correct number of arguments was passed in.
   if (argc < 3){
     printf("Error, program needs DNS hostname and port number as arguments\n");
     return -1;
   }
 
+  // Open the socket to open communicatoin with server.
   Socket connection_socket;
   connection_socket = Socket_new(argv[1], atoi(argv[2]));
   if (connection_socket < 0){

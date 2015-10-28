@@ -20,14 +20,15 @@
 #define MAX_ARGS 100
 
 // TODO ALL THIS APPLIES TO THE CLIENT TOO
-// TODO check for length of max pid!!
+// TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff
 // TODO remove print statements
-// TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff.
 // TODO are we checking for ALL of the errors? from all of the functions we use?
-// TODO make sure tmp file is removes on unnatural exit
 
 
-//TODO if server strings are null terminated client should behave as expected.
+/*
+ * This is an identical function to the one from HW2. It uses strtok to break up
+ * the command for execvp in the child process
+ */
 int parse_args(char *raw_arg_string, char **string_array){
   char *token;
   char white_space_delim[] = " \t\n\v\f\r";
@@ -229,7 +230,11 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
   return 0;
 }
 
-//TODO what about a call to getpid? error code for that right?
+/*
+ * The server process redirects it stdout to a file. That file's name is
+ * the string "tmp" concatenated with the PID of the current process. This function
+ * uses sprintf to format that string so the file can be created.
+ */
 char* get_tmp_file_name(){
   char* tmp_file_name = (char*) malloc ((TMP_FILE_PREFIX_LEN + MAX_PID_LEN) * sizeof(char));
   int ret_val = sprintf(tmp_file_name, "tmp%d", getpid());
@@ -241,8 +246,15 @@ char* get_tmp_file_name(){
   }
 }
 
+/* 
+ * This function is used to pass RESPONSE lines to the client.
+ * It simply takes a socket and a line and passes the line to
+ * the client program.
+ */
 int send_line(Socket connection_socket, char* line){
-  //TODO check if line==null
+  if(line == NULL){
+    return -1;
+  }
   int length = strlen(line);
   length = length + 1; /*need to include null terminator*/
 
@@ -258,9 +270,20 @@ int send_line(Socket connection_socket, char* line){
       exit (-1);
     }
   }
-
+  return 0;
 }
 
+/*
+ *  This is the server side implementation of a remote shell, it takes as its argument
+ *  a port number correpsonding to the port number that the client is attempting
+ *  to reach this server program on. This program accepts characters from the socket
+ *  and when a full line has been passed takes the inputted line and executes it as a
+ *  command. Other functions take care of passing the actual message and a response
+ *  line back to the client program. More specifically this main function has to 
+ *  establish a socket connection and do a few set up functions, if the connection
+ *  is open but an error occurs that prevents the server from running, it lets
+ *  the client now so it can terminate as well.
+ */
 int main(int argc, char **argv) {
   char error_string[140];
   bool error_found = false;
@@ -271,10 +294,17 @@ int main(int argc, char **argv) {
   ServerSocket welcome_socket;
   Socket connection_socket;
 
+  // Verify correct number of arguments was passed in.
   if (argc < 2) {
     printf("Error must specify port\n");
     return -1;
   }
+
+  /* 
+   * Need to attain a welcome socket which is then passed to
+   * another function to get the actual connection_socket
+   * we need to communicate with the client.
+   */
   welcome_socket = ServerSocket_new(atoi(argv[1]));
   if (welcome_socket < 0){
     printf("Error failed to create welcome socket\n");
@@ -287,14 +317,18 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  // first command
-  //TODO free this
+  // Get the name of the tmp file created for this specific instance
+  // of this program.
   char *tmp_file_name = get_tmp_file_name(); //tmpxxxx
   if (tmp_file_name == NULL){
     sprintf(error_string, "Failed to construct tmp_file_name_string\n");
     error_found = true;
   } 
-  // second command
+  /*
+   * Use freopen to write stdout from exec'd command to the
+   * file we opened in order to capture that output and
+   * send it back to the client.
+   */
   errno = 0;
   fp = freopen(tmp_file_name, "w+", stdout);
   if(fp == NULL){
@@ -308,6 +342,12 @@ int main(int argc, char **argv) {
     error_found = true;
   }
 
+  /*
+   * If the server fails a malloc, fails to make the tmp file's name or the actual
+   * temp file then the server can not function. In this case, we send a fatal
+   * error to the client so it knows to shut down. Otherwise we execute the main 
+   * loop of the program, to listen and accept characters until EOF.
+   */
   if(error_found){
     char* response_string = (char*) malloc (RESPONSE_STR_LEN * sizeof(char));
     if(response_string == NULL){
@@ -318,13 +358,15 @@ int main(int argc, char **argv) {
       send_line(connection_socket, response_string);
       free(response_string);
     }
-    //TODO send to client BUT MAKE SURE CLIENT TERMINATES.
   } else {
 
-    //TODO main while loop terminates when sock_char == EOF
-    //inner while loop waits for null character and then sends that
-    //string to run command
-
+    /*
+     * This function listens on the socket and exits when it receives
+     * EOF. In it's body, it checks to see if it receives the null terminator
+     * if it does, then it sends the line that it was storing to the
+     * run_command function which takes care of executing the command
+     * and communicating the results with the client.
+     */
     i = 0;
     do {  
       sock_char = Socket_getc(connection_socket);
@@ -348,7 +390,6 @@ int main(int argc, char **argv) {
     remove(tmp_file_name);
   }
 
-  //TODO should welcome socket be closed earlier?
   free(sock_array);
   free(tmp_file_name);
   Socket_close(welcome_socket);
