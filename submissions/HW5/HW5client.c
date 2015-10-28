@@ -27,18 +27,23 @@
  */
 bool parse_response(char* response_string){
   char* ret_val;
+  char* ret_val2;
   ret_val = strstr(response_string, RESPONSE);
-  printf("%s", response_string);
   if (ret_val == NULL) {
+    printf("%s", response_string);
     return true;
   } else {
-    ret_val = strstr(response_string, FATAL_ERROR);
-    if (ret_val == NULL){
+    ret_val = strstr(response_string, GENERIC_ERROR);
+    ret_val2 = strstr(response_string, FATAL_ERROR);
+
+    if((ret_val != NULL) || (ret_val2 != NULL)){
+      printf("%s", response_string);
+      if(ret_val2 != NULL){
+        printf("Fatal error: Server has terminated and client must terminate as a result\n");
+        exit (-1);
+      }
       return false;
-    } else {
-      printf("Fatal error: Server has terminated and client must terminate as a result\n");
-      exit (-1);
-    }
+    } 
   }
 }
 
@@ -101,7 +106,7 @@ int run_shell(Socket connection_socket) {
     chars_read = chars_read + 1; /* getline doesn't include null terminator*/
     if ( (chars_read > MAX_LINE_LEN) || (getline_error) ){
       getline_error = false;
-      printf("Error, maximum line length is 1024");
+      printf("Error, maximum line length is 1024\n");
     } else {
 
       /* 

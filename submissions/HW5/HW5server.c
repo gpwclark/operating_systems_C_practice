@@ -60,7 +60,8 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
    */
   if (child_PID < 0){
     // no child process created, fork failed
-    sprintf(error_string, "No child process, failed to fork: %s", strerror(errno));
+    // GENERIC_ERROR
+    sprintf(error_string, "%s: No child process, failed to fork: %s", GENERIC_ERROR ,strerror(errno));
     error_found = true;
   } else if (child_PID == 0){
     /*
@@ -106,7 +107,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
     child_PID = waitpid(child_PID, &status, WCONTINUED);
 
     if (child_PID == -1){ //Wait for child process.  
-      sprintf(error_string, "Wait error: %s\n", strerror(errno)); 
+      sprintf(error_string, "%s: Wait error: %s\n", GENERIC_ERROR, strerror(errno)); 
       error_found = true;
     } else { 
 
@@ -128,7 +129,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
         errno = 0;
         fp = fopen(tmp_file_name, "r");
         if (fp == NULL){
-          sprintf(error_string, "Failed to open file with stdout for reading: %s", strerror(errno));
+          sprintf(error_string, "%s: Failed to open file with stdout for reading: %s",GENERIC_ERROR, strerror(errno));
           error_found = true;
         } else {
 
@@ -149,7 +150,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
             if (num_bytes_read == -1){
               if (errno != -1){
-                sprintf(error_string, "Error while attempting to read file with stdout from exec comand: %s", strerror(errno));
+                sprintf(error_string, "%s: Error while attempting to read file from exec comand: %s", GENERIC_ERROR, strerror(errno));
                 error_found = true;
                 //TODO send error, file IO
                 break;
@@ -182,7 +183,7 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
            */
           FILE *fp = fopen(tmp_file_name, "w");
           if (fp == NULL){
-            sprintf(error_string, "Failed to clear contents of tmp file: %s", strerror(errno));
+            sprintf(error_string, "%s: Failed to clear contents of tmp file: %s",GENERIC_ERROR, strerror(errno));
             error_found = true;
           }
         }
@@ -209,15 +210,18 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
          * error.
          */
         if (wif_exited != 0){
-          if (exit_status == 2){
+          if (exit_status == 1){
+            //exit code 1
+            sprintf(response_string,"%s: %s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, GENERIC_ERROR, "Exec'd command reported error", wif_exited, 1);
+          } else if (exit_status == 2){
             //exit code 2
-            sprintf(response_string,"%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE,"Error, Child's malloc failed for constructing the argument list", wif_exited, 1);
+            sprintf(response_string,"%s: %s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, GENERIC_ERROR,"Error, Child's malloc failed for constructing the argument list", wif_exited, 1);
           } else if (exit_status ==3){
             //exit code 3
-            sprintf(response_string, "%s: %s%d, Exit Code: %d, Exit Status: %d\n", RESPONSE,"Error, Line exceeds max number of arguments: ", MAX_ARGS - 1, wif_exited, 1);
+            sprintf(response_string, "%s: %s: %s%d, Exit Code: %d, Exit Status: %d\n", RESPONSE, GENERIC_ERROR,"Error, Line exceeds max number of arguments: ", MAX_ARGS - 1, wif_exited, 1);
           } else if (exit_status == 4){
             //Exit code 4
-            sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "Error, Failed to execute, error with command as inputted", wif_exited, 1);
+            sprintf(response_string, "%s: %s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, GENERIC_ERROR,"Error, Failed to execute, error with command as inputted", wif_exited, 1);
           } else {
             sprintf(response_string, "%s: %s, Exit Code: %d, Exit Status: %d\n", RESPONSE, "End of stdout", wif_exited, exit_status);
           }
