@@ -19,11 +19,7 @@
 #define MAX_PID_LEN 5
 #define MAX_ARGS 100
 
-// TODO ALL THIS APPLIES TO THE CLIENT TOO
-// TODO COMMENT YOUR CODE and check that thing about loops and invariants and stuff
 // TODO remove print statements
-// TODO are we checking for ALL of the errors? from all of the functions we use?
-
 
 /*
  * This is an identical function to the one from HW2. It uses strtok to break up
@@ -199,12 +195,25 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
 
       char response_string[RESPONSE_STR_LEN];
 
+      /*
+       * Once we have sent all of the contents of the tmp file
+       * we need to send a response line, if an error occured 
+       * during the sending of stdout, we handle that, otherwise
+       * we send a normal RESPONSE.
+       */
       if(error_found){
         //TODO needs to be send to client
         sprintf(response_string, "%s: %s\n", RESPONSE, error_string);
         fprintf(stderr, "%s", response_string);
       } else {
-        // RESPONSE: End of Comand's stdout: exit_code: %d, exit_status: %d
+        /*
+         * This logic handles sending the wif_exited value and if necessary
+         * the exit status. The child function has custom error codes to 
+         * ensure the error messages are informative. If there was a custom 
+         * error code, we still pass the exit status as 1, because the actual
+         * values are extraneous and 1 indicates that there was some sort of
+         * error.
+         */
         if (wif_exited != 0){
           if (exit_status == 2){
             //exit code 2
@@ -224,6 +233,13 @@ int run_command(char* cmd_to_run, char* tmp_file_name, Socket connection_socket)
         //TODO send normal response to client
         fprintf(stderr, "%s", response_string);
       }
+      
+      /*
+       * This is where we actually send the response line, all the previous
+       * logic has taken care of whether or not this is a normal response or 
+       * an error so here we just pass whatever the response_string is to
+       * send_line so that the client can receive the appropriate response.
+       */
       send_line(connection_socket, response_string);
     }
     //printf("%s\n","Parent process ended.");
