@@ -29,6 +29,17 @@
  * is 80 characters long.
  */
 
+/* Discussion of how I am using memory mapped files:
+ * My memory mapped files are completely hidden from the main program.
+ * In the loop of main I call the function buffer_init. This function
+ * returns a synced_buffer object. The memory mapped file is just
+ * synced_buffer->buffer, and was assigned to that position via the function
+ * make_shared_mem in the buffer.c program. Because using it is like an array, 
+ * I didn't even need to change the way the producer's and consumer's interacted
+ * with this buffer in their own logic. When I am done with the synced_buffer I 
+ * called the function delete_shared_mem(synced_buffer->buffer) so linux can
+ * unmap the memory.
+ */
 
 #include <string.h>
 #include <stdio.h>
