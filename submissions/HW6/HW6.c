@@ -4,27 +4,31 @@
  * and now that I am, I would like to say that I have neither given or 
  * received help on this program.
  * George Clark
+ *
+ *
+ * THESE ARE THE RESOURCES I USED. Although I mainly used the youtube video,
+ * thanks ryan!
+ *
+ * https://www.safaribooksonline.com/library/view/linux-system-programming/0596009585/ch04s03.html
+ *
+ * http://stackoverflow.com/questions/16400820/c-how-to-use-posix-semaphores-on-forked-processes
+ *
  */ 
 
 
 /* Main explanation:
- * This program creates a bunch of thread objects that share buffers 
- * between them. Each thread has an assigned function, and those function
- * are evaluated in each thread and their IO is shared in a pipeline
- * via the shared buffers. There are 5 threads and 4 shared buffers
- * between them. The first thread gets data from the user, the second
- * thread verifies the input is valid, the third thread performs a 
- * char substitution, the fourth thread performs a char substitution,
- * and the last thread prints the contents of a global buffer, made
+ * This program creates a bunch of  processes that share buffers 
+ * between them. Each process has an assigned function, and those function
+ * are evaluated in each process and their IO is shared in a pipeline
+ * via the shared memory. There are 5 processes and 4 shared buffers
+ * between them. The first process gets data from the user, the second
+ * process verifies the input is valid, the third process performs a 
+ * char substitution, the fourth process performs a char substitution,
+ * and the last process prints the contents of a global buffer, made
  * up of data it read from its shared buffer iff its special buffer
  * is 80 characters long.
  */
 
-// TODO make another pass at using asterisk_found variable
-// TODO free memory
-// TODO address in doc TODOs
-// TODO make sure print statements are out except the ones that shouldn't be
-// TODO turn the last 200 lines of procedural code into a loop?
 
 #include <string.h>
 #include <stdio.h>
@@ -37,8 +41,6 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
-//includes for the ST library in CORRECT ORDER, DO NOT REARRANGE
-#include "st.h"
 //#include "semaphore.h"
 #include "sem_conditionals.h"
 #include "buffer.h"
@@ -54,7 +56,7 @@
 
 /* me define buffer size to be sufficiently large, if producer runs much more 
  * than the consumuer, we could have a situation where the producer is waiting
- * to write
+ * to write, so I made it 200 because that seemed reasonable.
  */
 #define BUFFER_SIZE 200
 #define FCN_ARRAY_LEN 5
@@ -155,7 +157,6 @@ int get_user_input(int character){
  */
 
   int hybrid(void *init_hybrid_buf){
-    //fprintf(stderr,"hybrid: %d running.\n",getpid());
     hybrid_buffer *hybrid_buf = init_hybrid_buf;
     int input_char;
     int input_char1;
@@ -245,6 +246,18 @@ int get_user_input(int character){
     exit(0);
   }
 
+/*
+ * This is a long but very straight forward function. Main is just responsible
+ * for set-up and tear down. To begin, it creates the 4 synced buffers that
+ * each of our 5 processes are going to need a reference to. Then it creates
+ * each of the objects that each of the processes is going to use to run,
+ * these objects (e.g. hybrid_buf_a) are important because they have a 
+ * reference to the pointer that holds the function they will be executing
+ * while processing. After that, all of the processes are started then
+ * this parent process waits for the children to complete and when it does
+ * it frees all of the memory, including getting rid of the semaphores
+ * and shared memory.
+ * */
 int main () {
 
   print_buffer = (int *) malloc(sizeof(int)*LINE_PRINT_LENGTH);
@@ -268,10 +281,17 @@ int main () {
    * Each function is in one thread, and there are four buffers being shared b/w
    * them all.
    */
-  synced_buffer *s_buf_1 = buffer_init();
-  synced_buffer *s_buf_2 = buffer_init();
-  synced_buffer *s_buf_3 = buffer_init();
-  synced_buffer *s_buf_4 = buffer_init();
+  
+  // Each buffer needs a unique string to be used to make a unique semaphore name
+  int sbuf_str_len = 5;
+  char sbuf1[] = "sbuf1";
+  synced_buffer *s_buf_1 = buffer_init(sbuf1,sbuf_str_len);
+  char sbuf2[] = "sbuf2";
+  synced_buffer *s_buf_2 = buffer_init(sbuf2,sbuf_str_len);
+  char sbuf3[] = "sbuf3";
+  synced_buffer *s_buf_3 = buffer_init(sbuf3,sbuf_str_len);
+  char sbuf4[] = "sbuf4";
+  synced_buffer *s_buf_4 = buffer_init(sbuf4,sbuf_str_len);
 
   if (s_buf_1 == NULL || s_buf_2 == NULL ||  s_buf_3 == NULL || s_buf_4 == NULL){
     //fprintf(stderr,"Failed to allocate memory for buffer ADT");
@@ -352,9 +372,6 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
-    // this is the child process
-    // app logic
     producer(prod_buf);
   } 
 
@@ -365,9 +382,6 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
-    // this is the child process
-    // app logic
     hybrid(hybrid_buf_a);
   } 
 
@@ -375,12 +389,8 @@ int main () {
   child_PID = fork();
   errno = 0;
   if (child_PID < 0){
-    // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
-    // this is the child process
-    // app logic
     hybrid(hybrid_buf_b);
   } 
 
@@ -391,9 +401,6 @@ int main () {
     // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
-    // this is the child process
-    // app logic
     hybrid(hybrid_buf_c);
   } 
 
@@ -401,33 +408,25 @@ int main () {
   child_PID = fork();
   errno = 0;
   if (child_PID < 0){
-    // no child process created, fork failed
     perror("No child process, failed to fork");
   }else if (child_PID == 0){
-    //fprintf(stderr,"I am the child. My childPID is %ld\n", (long)child_PID);
-    // this is the child process
-    // app logic
     consumer(cons_buf);
   } 
 
-  //fprintf(stderr,"I am the parent. My PID is %d\n", getpid()); 
-
-  //TODO is errno used in perror?
   errno = 0;
   while ((wait_PID = wait(&status)) > 0) {
     if (wait_PID == -1){
-      perror("wait() error");
+      perror("wait error");
     } else {
 
       if (WIFSIGNALED(status) != 0){
-        //fprintf(stderr,"Child process: %d terminated, signal: %d \n",(int)wait_PID,WTERMSIG(status));
+        fprintf(stderr,"Child process: %d terminated, signal: %d \n",(int)wait_PID,WTERMSIG(status));
       } else if (WIFEXITED(status) != 0){
-        //TODO take this one out!!!
         //fprintf(stderr,"Child process %d terminated as expected.\n",(int)wait_PID);
       } else if(WIFSTOPPED(status != 0)){
-        //fprintf(stderr,"Child process: %d stopped.\n", (int)wait_PID);
+        fprintf(stderr,"Child process: %d stopped.\n", (int)wait_PID);
       } else{
-        //fprintf(stderr,"Child process: %d terminated with error.\n", (int)wait_PID);
+        fprintf(stderr,"Child process: %d terminated with error.\n", (int)wait_PID);
       }
 
 
@@ -435,6 +434,14 @@ int main () {
   }
 
   // free all allocated memory.
+  sem_cleanup(s_buf_1);
+  sem_cleanup(s_buf_2);
+  sem_cleanup(s_buf_3);
+  sem_cleanup(s_buf_4);
+  delete_shared_mem(s_buf_1->buffer);
+  delete_shared_mem(s_buf_2->buffer);
+  delete_shared_mem(s_buf_3->buffer);
+  delete_shared_mem(s_buf_4->buffer);
   free(s_buf_1);
   free(s_buf_2);
   free(s_buf_3);
@@ -446,5 +453,4 @@ int main () {
   free(cons_buf);
   free(print_buffer);
   exit(0);
-  //return 0;
 }

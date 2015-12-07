@@ -1,2 +1,2 @@
 #!/bin/bash
-gcc buffer.c HW3.c semaphore.o -L. -lst -o hw3
+gcc buffer.c HW6.c -pthread -o hw6
